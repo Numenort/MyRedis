@@ -490,3 +490,130 @@ func TestUndoLPush(t *testing.T) {
 	result := testDB.Exec(nil, utils.ToCmdLine("llen", key))
 	assert.AssertIntReply(t, result, 1)
 }
+
+func TestUndoLPop(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	size := 10
+	values := make([]string, size)
+	pushArgs := []string{key}
+	for i := 0; i < size; i++ {
+		values[i] = utils.RandString(10)
+		pushArgs = append(pushArgs, values[i])
+	}
+	testDB.Exec(nil, utils.ToCmdLine2("lpush", pushArgs...))
+	result0 := testDB.Exec(nil, utils.ToCmdLine("lrange", key, strconv.Itoa(0), strconv.Itoa(size)))
+
+	// test single lpop
+	cmdLine := utils.ToCmdLine("lpop", key)
+	undoCmdLines := undoLPop(testDB, cmdLine[1:])
+	testDB.Exec(nil, cmdLine)
+	result := testDB.Exec(nil, utils.ToCmdLine("llen", key))
+	assert.AssertIntReply(t, result, 9)
+	for _, cmdLine := range undoCmdLines {
+		testDB.Exec(nil, cmdLine)
+	}
+	result = testDB.Exec(nil, utils.ToCmdLine("llen", key))
+	assert.AssertIntReply(t, result, size)
+	result = testDB.Exec(nil, utils.ToCmdLine("lrange", key, strconv.Itoa(0), strconv.Itoa(size)))
+	if !utils.Equals(result0.ToBytes(), result.ToBytes()) {
+		t.Errorf("expected %s, actually %s", result0.ToBytes(), result.ToBytes())
+	}
+
+	// test multi lpop
+	cmdLine = utils.ToCmdLine("lpop", key, strconv.Itoa(size))
+	undoCmdLines = undoLPop(testDB, cmdLine[1:])
+	testDB.Exec(nil, cmdLine)
+	result = testDB.Exec(nil, utils.ToCmdLine("llen", key))
+	assert.AssertIntReply(t, result, 0)
+	for _, cmdLine := range undoCmdLines {
+		testDB.Exec(nil, cmdLine)
+	}
+	result = testDB.Exec(nil, utils.ToCmdLine("llen", key))
+	assert.AssertIntReply(t, result, size)
+	result = testDB.Exec(nil, utils.ToCmdLine("lrange", key, strconv.Itoa(0), strconv.Itoa(size)))
+	if !utils.Equals(result0.ToBytes(), result.ToBytes()) {
+		t.Errorf("expected %s, actually %s", result0.ToBytes(), result.ToBytes())
+	}
+}
+
+func TestUndoLSet(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	value := utils.RandString(10)
+	value2 := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine("lpush", key, value, value))
+	cmdLine := utils.ToCmdLine("lset", key, "1", value2)
+	undoCmdLines := undoLSet(testDB, cmdLine[1:])
+	testDB.Exec(nil, cmdLine)
+	for _, cmdLine := range undoCmdLines {
+		testDB.Exec(nil, cmdLine)
+	}
+	result := testDB.Exec(nil, utils.ToCmdLine("lindex", key, "1"))
+	assert.AssertBulkReply(t, result, value)
+}
+
+func TestUndoRPop(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	size := 10
+	values := make([]string, size)
+	pushArgs := []string{key}
+	for i := 0; i < size; i++ {
+		values[i] = utils.RandString(10)
+		pushArgs = append(pushArgs, values[i])
+	}
+	testDB.Exec(nil, utils.ToCmdLine2("rpush", pushArgs...))
+	result0 := testDB.Exec(nil, utils.ToCmdLine("lrange", key, strconv.Itoa(0), strconv.Itoa(size)))
+
+	// test single rpop
+	cmdLine := utils.ToCmdLine("rpop", key)
+	undoCmdLines := undoRPop(testDB, cmdLine[1:])
+	testDB.Exec(nil, cmdLine)
+	result := testDB.Exec(nil, utils.ToCmdLine("llen", key))
+	assert.AssertIntReply(t, result, 9)
+	for _, cmdLine := range undoCmdLines {
+		testDB.Exec(nil, cmdLine)
+	}
+	result = testDB.Exec(nil, utils.ToCmdLine("llen", key))
+	assert.AssertIntReply(t, result, size)
+	result = testDB.Exec(nil, utils.ToCmdLine("lrange", key, strconv.Itoa(0), strconv.Itoa(size)))
+	if !utils.Equals(result0.ToBytes(), result.ToBytes()) {
+		t.Errorf("expected %s, actually %s", result0.ToBytes(), result.ToBytes())
+	}
+
+	// test multi rpop
+	cmdLine = utils.ToCmdLine("rpop", key, strconv.Itoa(size))
+	undoCmdLines = undoRPop(testDB, cmdLine[1:])
+	testDB.Exec(nil, cmdLine)
+	result = testDB.Exec(nil, utils.ToCmdLine("llen", key))
+	assert.AssertIntReply(t, result, 0)
+	for _, cmdLine := range undoCmdLines {
+		testDB.Exec(nil, cmdLine)
+	}
+	result = testDB.Exec(nil, utils.ToCmdLine("llen", key))
+	assert.AssertIntReply(t, result, size)
+	result = testDB.Exec(nil, utils.ToCmdLine("lrange", key, strconv.Itoa(0), strconv.Itoa(size)))
+	if !utils.Equals(result0.ToBytes(), result.ToBytes()) {
+		t.Errorf("expected %s, actually %s", result0.ToBytes(), result.ToBytes())
+	}
+}
+
+func TestUndoRPopLPush(t *testing.T) {
+	testDB.Flush()
+	key1 := utils.RandString(10)
+	key2 := utils.RandString(10)
+	value := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine("lpush", key1, value))
+
+	cmdLine := utils.ToCmdLine("rpoplpush", key1, key2)
+	undoCmdLines := undoRPopLPush(testDB, cmdLine[1:])
+	testDB.Exec(nil, cmdLine)
+	for _, cmdLine := range undoCmdLines {
+		testDB.Exec(nil, cmdLine)
+	}
+	result := testDB.Exec(nil, utils.ToCmdLine("llen", key1))
+	assert.AssertIntReply(t, result, 1)
+	result = testDB.Exec(nil, utils.ToCmdLine("llen", key2))
+	assert.AssertIntReply(t, result, 0)
+}
