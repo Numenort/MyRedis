@@ -1,0 +1,37 @@
+{"editor.tokenColorCustomizations": {
+        "[*Light*]": {
+            "textMateRules": [
+                {
+                    "scope": "ref.matchtext",
+                    "settings": {
+                        "foreground": "#000"
+                    }
+                },
+                 {
+                    "scope":"comment.line.double-slash.go",
+                    "settings": {
+                        "foreground": "#ff00c8",
+                        "fontStyle": "bold"
+                    }
+                }
+            ]
+        },
+        "[*Dark*]": {
+            "textMateRules": [
+                {
+                    "scope": "ref.matchtext",
+                    "settings": {
+                        "foreground": "#fff"
+                    }
+                },
+                {
+                    "scope":"comment.line.double-slash.go",
+                    "settings": {
+                        "foreground": "#ff00c8",
+                        "fontStyle": "bold"
+                    }
+                }
+            ]
+        }
+    }
+}
