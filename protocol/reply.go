@@ -3,7 +3,7 @@ package protocol
 import (
 	"bytes"
 	"errors"
-	"myredis/myredis"
+	"myredis/interface/myredis"
 	"strconv"
 )
 

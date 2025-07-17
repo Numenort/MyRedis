@@ -1,4 +1,4 @@
-package redis
+package myredis
 
 type Connection interface {
 	Write([]byte) (int, error)

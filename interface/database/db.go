@@ -1,8 +1,7 @@
 package database
 
 import (
-	"myredis/interface/redis"
-	"myredis/myredis"
+	"myredis/interface/myredis"
 	"time"
 
 	"github.com/hdt3213/rdb/core"
@@ -12,8 +11,8 @@ type CmdLine = [][]byte
 
 // DB 需要实现：命令的执行、处理客户端连接关闭、关闭数据库、加载 RDB 快照
 type DB interface {
-	Exec(client redis.Connection, cmdLine [][]byte) myredis.Reply
-	AfterClientClose(c redis.Connection)
+	Exec(client myredis.Connection, cmdLine [][]byte) myredis.Reply
+	AfterClientClose(c myredis.Connection)
 	Close()
 	LoadRDB(dec *core.Decoder) error
 }
@@ -23,8 +22,8 @@ type KeyEventCallback func(dbIndex int, key string, entity *DataEntity)
 
 type DBEngine interface {
 	DB
-	ExecWithLock(conn redis.Connection, cmdLine [][]byte) myredis.Reply
-	ExecMulti(conn redis.Connection, cmdLine [][]byte) myredis.Reply
+	ExecWithLock(conn myredis.Connection, cmdLine [][]byte) myredis.Reply
+	ExecMulti(conn myredis.Connection, cmdLine [][]byte) myredis.Reply
 	GetUndoLogs(dbIndex int, cmdLine [][]byte) []CmdLine
 	RWLocks(dbIndex int, writeKeys []string, readKeys []string)
 	RWUnLocks(dbIndex int, writeKeys []string, readKeys []string)

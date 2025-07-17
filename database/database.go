@@ -3,10 +3,9 @@ package database
 import (
 	"myredis/datastruct/dict"
 	"myredis/interface/database"
-	"myredis/interface/redis"
+	"myredis/interface/myredis"
 	"myredis/lib/logger"
 	"myredis/lib/timewheel"
-	"myredis/myredis"
 	"myredis/protocol"
 	"strings"
 	"time"
@@ -56,7 +55,7 @@ func makeDB() *DB {
 	return db
 }
 
-func (db *DB) Exec(c redis.Connection, cmdLine [][]byte) myredis.Reply {
+func (db *DB) Exec(c myredis.Connection, cmdLine [][]byte) myredis.Reply {
 	cmdName := strings.ToLower(string(cmdLine[0]))
 	// 设置连接进入事务状态 (多命令执行)
 	if cmdName == "multi" {

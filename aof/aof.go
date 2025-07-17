@@ -5,6 +5,7 @@ import (
 	"io"
 	"myredis/interface/database"
 	"myredis/lib/logger"
+	"myredis/parser"
 	"os"
 	"sync"
 
@@ -63,6 +64,7 @@ func NewPersister(db database.DBEngine, filename string, load bool, fsync string
 	}
 }
 
+// maxBytes: 最大可读字节
 func (persister *Persister) LoadAof(maxBytes int) {
 	// 加载 AOF 文件时关闭该通道防止冲突
 	aofChan := persister.aofChan
@@ -84,7 +86,7 @@ func (persister *Persister) LoadAof(maxBytes int) {
 
 	// 尝试加载 rdb 快照
 	decoder := rdb.NewDecoder(file)
-	err := persister.db.LoadRDB(decoder)
+	err = persister.db.LoadRDB(decoder)
 	if err != nil {
 		// 没有 rdb 快照，从 0 开始
 		file.Seek(0, io.SeekStart)
@@ -92,5 +94,13 @@ func (persister *Persister) LoadAof(maxBytes int) {
 		_, _ = file.Seek(int64(decoder.GetReadCount())+1, io.SeekStart)
 		maxBytes = maxBytes - decoder.GetReadCount()
 	}
+	var reader io.Reader
+	if maxBytes > 0 {
+		reader = io.LimitReader(reader, int64(maxBytes))
+	} else {
+		reader = file
+	}
+
+	ch := parser.ParseStream(reader)
 
 }

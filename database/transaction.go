@@ -1,14 +1,13 @@
 package database
 
 import (
-	"myredis/interface/redis"
-	"myredis/myredis"
+	"myredis/interface/myredis"
 	"myredis/protocol"
 	"strings"
 )
 
 // ******************** startMulti ********************
-func StartMulti(conn redis.Connection) myredis.Reply {
+func StartMulti(conn myredis.Connection) myredis.Reply {
 	if conn.InMultiState() {
 		return protocol.MakeErrReply("ERR MULTI calls can not be nested")
 	}
@@ -17,7 +16,7 @@ func StartMulti(conn redis.Connection) myredis.Reply {
 }
 
 // ******************** DiscardMulti ********************
-func DiscardMulti(conn redis.Connection) myredis.Reply {
+func DiscardMulti(conn myredis.Connection) myredis.Reply {
 	if !conn.InMultiState() {
 		return protocol.MakeErrReply("ERR DISCARD without MULTI")
 	}
@@ -27,7 +26,7 @@ func DiscardMulti(conn redis.Connection) myredis.Reply {
 }
 
 // ******************** execMulti ********************
-func execMulti(db *DB, conn redis.Connection) myredis.Reply {
+func execMulti(db *DB, conn myredis.Connection) myredis.Reply {
 	if !conn.InMultiState() {
 		return protocol.MakeErrReply("ERR EXEC without MULTI")
 	}
@@ -40,7 +39,7 @@ func execMulti(db *DB, conn redis.Connection) myredis.Reply {
 }
 
 // 原子性地执行事务
-func (db *DB) ExecMulti(conn redis.Connection, watching map[string]uint32, cmdLines []CmdLine) myredis.Reply {
+func (db *DB) ExecMulti(conn myredis.Connection, watching map[string]uint32, cmdLines []CmdLine) myredis.Reply {
 	// 准备读写键
 	writeKeys := make([]string, 0)
 	readKeys := make([]string, 0)
@@ -126,7 +125,7 @@ func (db *DB) GetUndoLogs(cmdLine [][]byte) []CmdLine {
 }
 
 // ******************** Watch ********************
-func Watch(db *DB, conn redis.Connection, args [][]byte) myredis.Reply {
+func Watch(db *DB, conn myredis.Connection, args [][]byte) myredis.Reply {
 	watching := conn.GetWatching()
 	for _, bkey := range args {
 		key := string(bkey)
@@ -136,7 +135,7 @@ func Watch(db *DB, conn redis.Connection, args [][]byte) myredis.Reply {
 }
 
 // ******************** EnqueueCmd ********************
-func EnqueueCmd(conn redis.Connection, cmdLine [][]byte) myredis.Reply {
+func EnqueueCmd(conn myredis.Connection, cmdLine [][]byte) myredis.Reply {
 	cmdName := strings.ToLower(string(cmdLine[0]))
 	cmd, ok := cmdTable[cmdName]
 	if !ok {

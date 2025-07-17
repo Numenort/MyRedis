@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"myredis/myredis"
+	"myredis/interface/myredis"
 	"myredis/protocol"
 	"testing"
 )

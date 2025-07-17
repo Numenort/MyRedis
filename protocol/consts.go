@@ -2,7 +2,7 @@ package protocol
 
 import (
 	"bytes"
-	"myredis/myredis"
+	"myredis/interface/myredis"
 )
 
 /*

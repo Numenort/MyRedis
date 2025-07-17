@@ -1,7 +1,7 @@
 package database
 
 import (
-	"myredis/myredis"
+	"myredis/interface/myredis"
 	"myredis/protocol"
 	"strings"
 )

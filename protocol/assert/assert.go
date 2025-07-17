@@ -2,8 +2,8 @@ package assert
 
 import (
 	"fmt"
+	"myredis/interface/myredis"
 	"myredis/lib/utils"
-	"myredis/myredis"
 	"myredis/protocol"
 	"runtime"
 	"testing"
