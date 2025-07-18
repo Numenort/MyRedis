@@ -12,4 +12,6 @@ const (
 	redisFlagDenyOOM = "denyoom"
 	// 快速执行的命令
 	redisFlagFast = "fast"
+	// 脚本执行环境中需要确定性排序的命令
+	redisFlagSortForScript = "sortforscript"
 )

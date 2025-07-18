@@ -5,6 +5,8 @@ import "myredis/lib/utils"
 // 获取 write keys / read keys
 // 用于 multi 事务时，使用乐观锁进行加锁
 
+// 在命令实际执行前保存当前状态用于回滚
+
 // 命令只读取其第一个参数作为键
 // for example: GET <key>, EXISTS <key>, TTL <key>
 func readFirstKey(args [][]byte) ([]string, []string) {
@@ -90,4 +92,35 @@ func rollbackGivenKeys(db *DB, keys ...string) []CmdLine {
 		}
 	}
 	return undoCmdLine
+}
+
+// 回滚 Set 成员的相关函数，包含 SADD、SREM 以及 SPop
+func rollbackSetMembers(db *DB, key string, members ...string) []CmdLine {
+	var undoCmdLines [][][]byte
+	set, errReply := db.getAsSet(key)
+	if errReply != nil {
+		return nil
+	}
+	// 原始操作创建了这个集合，回滚需要删除该键
+	if set == nil {
+		undoCmdLines = append(undoCmdLines,
+			utils.ToCmdLine("DEL", key),
+		)
+		return undoCmdLines
+	}
+	for _, member := range members {
+		ok := set.Has(member)
+		// 原来不在集合内，即执行 SADD 命令，需要移除
+		if !ok {
+			undoCmdLines = append(undoCmdLines,
+				utils.ToCmdLine("SREM", key, member),
+			)
+			// 原来在集合内，即执行 SREM 命令，需要加入
+		} else {
+			undoCmdLines = append(undoCmdLines,
+				utils.ToCmdLine("SADD", key, member),
+			)
+		}
+	}
+	return undoCmdLines
 }

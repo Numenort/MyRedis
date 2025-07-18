@@ -147,7 +147,7 @@ func (s *Set) RandomMembers(limit int) []string {
 	return s.dict.RandomKeys(limit)
 }
 
-func (s *Set) RandomDistinctKeys(limit int) []string {
+func (s *Set) RandomDistinctMembers(limit int) []string {
 	return s.dict.RandomDistinctKeys(limit)
 }
 

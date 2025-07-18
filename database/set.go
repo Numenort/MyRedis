@@ -6,6 +6,7 @@ import (
 	"myredis/interface/myredis"
 	"myredis/protocol"
 	"strconv"
+	"strings"
 )
 
 func (db *DB) getAsSet(key string) (*HashSet.Set, protocol.ErrorReply) {
@@ -141,7 +142,7 @@ func execSPop(db *DB, args [][]byte) myredis.Reply {
 		count = set.Len()
 	}
 
-	members := set.RandomDistinctKeys(count)
+	members := set.RandomDistinctMembers(count)
 	result := make([][]byte, len(members))
 	for i, member := range members {
 		set.Remove(member)
@@ -170,7 +171,7 @@ func execSCard(db *DB, args [][]byte) myredis.Reply {
 }
 
 // 返回集合里的全部成员
-func execSMemebers(db *DB, args [][]byte) myredis.Reply {
+func execSMembers(db *DB, args [][]byte) myredis.Reply {
 	if len(args) != 1 {
 		return protocol.MakeErrReply("ERR wrong number of arguments for 'smembers' command")
 	}
@@ -341,4 +342,145 @@ func execSDiffStore(db *DB, args [][]byte) myredis.Reply {
 		Data: result,
 	})
 	return protocol.MakeIntReply(int64(result.Len()))
+}
+
+// 随机返回多个成员
+func execSRandMember(db *DB, args [][]byte) myredis.Reply {
+	if len(args) != 1 && len(args) != 2 {
+		return protocol.MakeErrReply("ERR wrong number of arguments for 'srandmember' command")
+	}
+	key := string(args[0])
+
+	set, errReply := db.getAsSet(key)
+	if errReply != nil {
+		return errReply
+	}
+	if set == nil {
+		return protocol.MakeNullBulkReply()
+	}
+	if len(args) == 1 {
+		members := set.RandomMembers(1)
+		return protocol.MakeBulkReply([]byte(members[0]))
+	}
+	count64, err := strconv.ParseInt(string(args[1]), 10, 64)
+	if err != nil {
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
+	}
+	count := int(count64)
+	if count > 0 {
+		members := set.RandomDistinctMembers(count)
+		result := make([][]byte, len(members))
+		for i, v := range members {
+			result[i] = []byte(v)
+		}
+		return protocol.MakeMultiBulkReply(result)
+	} else if count < 0 {
+		members := set.RandomMembers(-count)
+		result := make([][]byte, len(members))
+		for i, v := range members {
+			result[i] = []byte(v)
+		}
+		return protocol.MakeMultiBulkReply(result)
+	}
+	return &protocol.EmptyMultiBulkReply{}
+}
+
+// 增量迭代集合元素，支持游标分页和模式匹配，返回下一个游标以及对应的集合成员
+//
+// SSCAN key cursor [MATCH pattern] [COUNT count]
+func execSScan(db *DB, args [][]byte) myredis.Reply {
+	var count int = 10
+	var pattern string = "*"
+
+	if len(args) > 2 {
+		for i := 2; i < len(args); i++ {
+			arg := strings.ToLower(string(args[i]))
+			if arg == "count" {
+				// 下一个 arg 包含 count 数值
+				count64, err := strconv.ParseInt(string(args[i+1]), 10, 64)
+				if err != nil {
+					return protocol.MakeSyntaxErrReply()
+				}
+				count = int(count64)
+				i++ // 跳过下一个参数
+			} else if arg == "match" {
+				pattern = string(args[i+1])
+				i++ // 跳过下一个参数
+			} else {
+				return protocol.MakeSyntaxErrReply()
+			}
+		}
+	}
+
+	key := string(args[0])
+	set, errReply := db.getAsSet(key)
+	if errReply != nil {
+		return errReply
+	}
+	if set == nil {
+		return &protocol.EmptyMultiBulkReply{}
+	}
+	cursor64, err := strconv.ParseInt(string(args[1]), 10, 64)
+	if err != nil {
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
+	}
+	cursor := int(cursor64)
+
+	keysReply, nextCursor := set.SetScan(cursor, count, pattern)
+	if nextCursor < 0 {
+		return protocol.MakeErrReply("Invalid pattern argument")
+	}
+
+	result := make([]myredis.Reply, 2)
+	result[0] = protocol.MakeBulkReply([]byte(strconv.FormatInt(int64(nextCursor), 10)))
+	result[1] = protocol.MakeMultiBulkReply(keysReply)
+
+	return protocol.MakeMultiRawReply(result)
+}
+
+/* Set 的撤销函数 */
+
+func undoSetChange(db *DB, args [][]byte) []CmdLine {
+	key := string(args[0])
+	memberArgs := args[1:]
+	members := make([]string, len(memberArgs))
+	for i, memberArg := range memberArgs {
+		members[i] = string(memberArg)
+	}
+	return rollbackSetMembers(db, key, members...)
+}
+
+func init() {
+	registerCommand("SAdd", execSAdd, writeFirstKey, undoSetChange, -3, flagWrite).
+		attachCommandExtra([]string{redisFlagWrite, redisFlagDenyOOM, redisFlagFast}, 1, 1, 1)
+	registerCommand("SIsMember", execSIsMember, readFirstKey, nil, 3, flagReadOnly).
+		attachCommandExtra([]string{redisFlagReadonly, redisFlagFast}, 1, 1, 1)
+	registerCommand("SRem", execSRem, writeFirstKey, undoSetChange, -3, flagWrite).
+		attachCommandExtra([]string{redisFlagWrite, redisFlagFast}, 1, 1, 1)
+	registerCommand("SPop", execSPop, writeFirstKey, undoSetChange, -2, flagWrite).
+		attachCommandExtra([]string{redisFlagWrite, redisFlagRandom, redisFlagFast}, 1, 1, 1)
+	registerCommand("SCard", execSCard, readFirstKey, nil, 2, flagReadOnly).
+		attachCommandExtra([]string{redisFlagReadonly, redisFlagFast}, 1, 1, 1)
+	registerCommand("SMembers", execSMembers, readFirstKey, nil, 2, flagReadOnly).
+		attachCommandExtra([]string{redisFlagReadonly, redisFlagFast}, 1, 1, 1)
+
+	registerCommand("SInter", execSInter, prepareSetCalculate, nil, -2, flagReadOnly).
+		attachCommandExtra([]string{redisFlagReadonly, redisFlagSortForScript}, 1, -1, 1)
+	registerCommand("SInterStore", execSInterStore, prepareSetCalculateStore, rollbackFirstKey, -3, flagWrite).
+		attachCommandExtra([]string{redisFlagWrite, redisFlagDenyOOM}, 1, -1, 1)
+
+	registerCommand("SUnion", execSUnion, prepareSetCalculate, nil, -2, flagReadOnly).
+		attachCommandExtra([]string{redisFlagReadonly, redisFlagSortForScript}, 1, -1, 1)
+	registerCommand("SUnionStore", execSUnionStore, prepareSetCalculateStore, rollbackFirstKey, -3, flagWrite).
+		attachCommandExtra([]string{redisFlagWrite, redisFlagDenyOOM}, 1, -1, 1)
+
+	registerCommand("SDiff", execSDiff, prepareSetCalculate, nil, -2, flagReadOnly).
+		attachCommandExtra([]string{redisFlagReadonly, redisFlagSortForScript}, 1, 1, 1)
+	registerCommand("SDiffStore", execSDiffStore, prepareSetCalculateStore, rollbackFirstKey, -3, flagWrite).
+		attachCommandExtra([]string{redisFlagWrite, redisFlagDenyOOM}, 1, 1, 1)
+
+	registerCommand("SRandMember", execSRandMember, readFirstKey, nil, -2, flagReadOnly).
+		attachCommandExtra([]string{redisFlagReadonly, redisFlagRandom}, 1, 1, 1)
+	registerCommand("SScan", execSScan, readFirstKey, nil, -2, flagReadOnly).
+		attachCommandExtra([]string{redisFlagReadonly, redisFlagSortForScript}, 1, 1, 1)
 }
