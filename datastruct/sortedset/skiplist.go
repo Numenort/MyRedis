@@ -156,6 +156,7 @@ func (skiplist *skiplist) insert(member string, score float64) *node {
 
 func (skiplist *skiplist) removeNode(node *node, update []*node) {
 	// update[i] 记录的是在第 i 层上，值小于等于（或字典序小于）目标删除元素，且离目标删除元素最近的那个节点
+	// 在各层的最接近节点上更新 span
 	for i := int16(0); i < skiplist.level; i++ {
 		// 如果 update[i] 的 forward 指针指向了要删除的 node
 		if update[i].level[i].forward == node {
@@ -244,6 +245,131 @@ func (skiplist *skiplist) getByRank(rank int64) *node {
 	return nil
 }
 
-func (skiplist *skiplist) hasInRange(min Border, max Boreder) bool {
+// 判断 skiplist 是否存在落在某个区间范围内的节点
+func (skiplist *skiplist) hasInRange(min Border, max Border) bool {
+	// min 和 max 存在交集
+	if min.isIntersected(max) {
+		return false
+	}
+	// min > tail
+	node := skiplist.tail
+	if node == nil || !min.less(&node.Element) {
+		return false
+	}
+	// max < head
+	node = skiplist.header
+	if node == nil || !max.greater(&node.Element) {
+		return false
+	}
+	return true
+}
 
+// 得到第一个在指定范围内的节点（level 0）
+func (skiplist *skiplist) getFirstInRange(min Border, max Border) *node {
+	if !skiplist.hasInRange(min, max) {
+		return nil
+	}
+	node := skiplist.header
+	// 层级由高到低扫描，找到最后一个 不大于 min 的节点
+	for level := skiplist.level - 1; level >= 0; level-- {
+		// 下一个节点不为空，且下一个节点值小于 min 时
+		for node.level[level].forward != nil && !min.less(&node.level[level].forward.Element) {
+			node = node.level[level].forward
+		}
+	}
+	// node 为第一个大于 min 的节点
+	node = node.level[0].forward
+	// 如果 node 大于 max 即不在范围
+	if !max.greater(&node.Element) {
+		return nil
+	}
+	return node
+}
+
+// 得到最后一个在指定范围内的节点（level 0）
+func (skiplist *skiplist) getLastInRange(min Border, max Border) *node {
+	if !skiplist.hasInRange(min, max) {
+		return nil
+	}
+	node := skiplist.header
+	// 层级由高到低扫描，找到第一个 不小于 max 的节点
+	for level := skiplist.level - 1; level >= 0; level-- {
+		// 下一个节点不为空，且下一个节点值小于 max 时
+		for node.level[level].forward != nil && max.greater(&node.level[level].forward.Element) {
+			node = node.level[level].forward
+		}
+	}
+	if !min.less(&node.Element) {
+		return nil
+	}
+	return node
+}
+
+// 按范围移除节点
+func (skiplist *skiplist) RemoveRange(min Border, max Border, limit int) (removed []*Element) {
+	// 存储每个层级的起始节点位置
+	update := make([]*node, maxLevel)
+	removed = make([]*Element, 0)
+
+	node := skiplist.header
+	//
+	for i := skiplist.level - 1; i >= 0; i-- {
+		for node.level[i].forward != nil {
+			// 如果 min 小于 节点值，已经找到起点
+			if min.less(&node.level[i].forward.Element) {
+				break
+			}
+			node = node.level[i].forward
+		}
+		update[i] = node
+	}
+
+	node = node.level[0].forward
+	// 从 level 0 开始删除
+	for node != nil {
+
+		if !max.greater(&node.Element) {
+			break
+		}
+		nextNode := node.level[0].forward
+		removedElement := node.Element
+		removed = append(removed, &removedElement)
+		skiplist.removeNode(node, update)
+		if limit > 0 && len(removed) == limit {
+			break
+		}
+		node = nextNode
+	}
+	return removed
+}
+
+// 按照排名移除节点
+func (skiplist *skiplist) RemoveRangeByRank(start int64, end int64) (removed []*Element) {
+	var i int64 = 0
+	update := make([]*node, maxLevel)
+	removed = make([]*Element, 0)
+
+	// 填充 update，找到每一层最接近的 node
+	node := skiplist.header
+	for level := skiplist.level - 1; level >= 0; level-- {
+		// 找到小于 start 的最大节点
+		for node.level[level].forward != nil && (i+node.level[level].span) < start {
+			i += node.level[level].span
+			node = node.level[level].forward
+		}
+		update[level] = node
+	}
+
+	i++
+	// 在范围内的起始节点，i 代表 level 0 层级的位次
+	node = node.level[0].forward
+	for node != nil && i < end {
+		nextNode := node.level[0].forward
+		removedElement := node.Element
+		removed = append(removed, &removedElement)
+		skiplist.removeNode(node, update)
+		node = nextNode
+		i++
+	}
+	return removed
 }
