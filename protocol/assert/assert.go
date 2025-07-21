@@ -34,7 +34,6 @@ func AssertErrReply(t *testing.T, actual myredis.Reply, expected string) {
 
 func AssertIntReply(t *testing.T, actual myredis.Reply, expected int) {
 	intResult, ok := actual.(*protocol.IntReply)
-	print(intResult, ok)
 	if !ok {
 		t.Errorf("expected int protocol, actually %s, %s", actual.ToBytes(), printStack())
 		return

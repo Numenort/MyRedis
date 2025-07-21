@@ -128,8 +128,8 @@ func Diff(sets ...*Set) *Set {
 		return Make()
 	}
 	result := sets[0].ShallowCopy()
-	for _, set := range sets {
-		set.ForEach(func(member string) bool {
+	for i := 1; i < len(sets); i++ {
+		sets[i].ForEach(func(member string) bool {
 			result.Remove(member)
 			return true
 		})
