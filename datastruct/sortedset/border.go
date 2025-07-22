@@ -11,7 +11,9 @@ Border 接口：用于表示范围边界，支持多种类型边界：
 	ScoreBorder
 	LexBorder
 
-	比较操作用于比较输入与自身的大小关系，greater：A.greater(B) = true -> A > B
+	比较操作用于比较输入与自身的大小关系:
+	greater: A.greater(B) = true -> A > B
+	less: A.less(B) = true -> A < B
 */
 type Border interface {
 	greater(element *Element) bool

@@ -26,12 +26,14 @@ type Level struct {
 	span    int64
 }
 
+// backward 指向当前节点在 level 0 的前一个节点
 type node struct {
 	Element
 	backward *node
 	level    []*Level
 }
 
+// header 为哨兵节点，tail 为真实节点
 type skiplist struct {
 	header *node
 	tail   *node
@@ -305,7 +307,7 @@ func (skiplist *skiplist) getLastInRange(min Border, max Border) *node {
 	return node
 }
 
-// 按范围移除节点
+// 按范围移除节点，limit 小于等于 0 代表没有限制
 func (skiplist *skiplist) RemoveRange(min Border, max Border, limit int) (removed []*Element) {
 	// 存储每个层级的起始节点位置
 	update := make([]*node, maxLevel)
