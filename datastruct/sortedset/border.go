@@ -44,7 +44,7 @@ func (border *ScoreBorder) greater(elelment *Element) bool {
 	if border.Inf == scoreNegativeInf {
 		return false
 	} else if border.Inf == scorePositiveInf {
-		return false
+		return true
 	}
 	if border.Exclude {
 		return border.Value > value
@@ -55,7 +55,7 @@ func (border *ScoreBorder) greater(elelment *Element) bool {
 func (border *ScoreBorder) less(elelment *Element) bool {
 	value := elelment.Score
 	if border.Inf == scoreNegativeInf {
-		return false
+		return true
 	} else if border.Inf == scorePositiveInf {
 		return false
 	}

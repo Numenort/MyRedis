@@ -1,6 +1,9 @@
 package sortedset
 
-import "strconv"
+import (
+	"myredis/lib/wildcard"
+	"strconv"
+)
 
 type SortedSet struct {
 	dict     map[string]*Element
@@ -221,4 +224,29 @@ func (sortedSet *SortedSet) PopMin(count int) []*Element {
 	return removed
 }
 
-func (sortedSet *SortedSet) 
+func (sortedSet *SortedSet) RemoveByRank(start int64, end int64) int64 {
+	removed := sortedSet.skiplist.RemoveRangeByRank(start+1, end+1)
+	for _, element := range removed {
+		delete(sortedSet.dict, element.Member)
+	}
+	return int64(len(removed))
+}
+
+func (sortedSet *SortedSet) ZSetScan(cursor int, count int, pattern string) ([][]byte, int) {
+	result := make([][]byte, 0)
+	matchKey, err := wildcard.CompilePattern(pattern)
+	if err != nil {
+		return result, -1
+	}
+	for k := range sortedSet.dict {
+		if pattern == "*" || matchKey.IsMatch(k) {
+			elem, exists := sortedSet.dict[k]
+			if !exists {
+				continue
+			}
+			result = append(result, []byte(k))
+			result = append(result, []byte(strconv.FormatFloat(elem.Score, 'f', 10, 64)))
+		}
+	}
+	return result, 0
+}
