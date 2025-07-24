@@ -282,7 +282,7 @@ func execZCount(db *DB, args [][]byte) myredis.Reply {
 	if errReply != nil {
 		return errReply
 	}
-	if sortedSet != nil {
+	if sortedSet == nil {
 		return protocol.MakeIntReply(0)
 	}
 	return protocol.MakeIntReply(sortedSet.RangeCount(min, max))
@@ -343,6 +343,7 @@ func execZRangeByScore(db *DB, args [][]byte) myredis.Reply {
 			v := string(args[i])
 			if strings.ToUpper(v) == "WITHSCORES" {
 				withScores = true
+				i++
 			} else if strings.ToUpper(v) == "LIMIT" {
 				if len(args) < i+3 {
 					return protocol.MakeErrReply("ERR syntax error")
@@ -371,11 +372,11 @@ func execZRevRangeByScore(db *DB, args [][]byte) myredis.Reply {
 	}
 
 	key := string(args[0])
-	min, err := SortedSet.ParseScoreBorder(string(args[1]))
+	min, err := SortedSet.ParseScoreBorder(string(args[2]))
 	if err != nil {
 		return protocol.MakeErrReply(err.Error())
 	}
-	max, err := SortedSet.ParseScoreBorder(string(args[2]))
+	max, err := SortedSet.ParseScoreBorder(string(args[1]))
 	if err != nil {
 		return protocol.MakeErrReply(err.Error())
 	}
@@ -388,6 +389,7 @@ func execZRevRangeByScore(db *DB, args [][]byte) myredis.Reply {
 			v := string(args[i])
 			if strings.ToUpper(v) == "WITHSCORES" {
 				withScores = true
+				i++
 			} else if strings.ToUpper(v) == "LIMIT" {
 				if len(args) < i+3 {
 					return protocol.MakeErrReply("ERR syntax error")
@@ -495,7 +497,7 @@ func execZPopMin(db *DB, args [][]byte) myredis.Reply {
 		var err error
 		count, err = strconv.Atoi(string(args[1]))
 		if err != nil {
-			return protocol.MakeErrReply(err.Error())
+			return protocol.MakeErrReply("ERR value is not an integer or out of range")
 		}
 	}
 
@@ -514,6 +516,7 @@ func execZPopMin(db *DB, args [][]byte) myredis.Reply {
 		result[i] = []byte(element.Member)
 		i++
 		result[i] = []byte(score)
+		i++
 	}
 	return protocol.MakeMultiBulkReply(result)
 }
@@ -689,7 +692,7 @@ func execZRevRangeByLex(db *DB, args [][]byte) myredis.Reply {
 		return protocol.MakeIntReply(0)
 	}
 
-	min_S, max_S := string(args[1]), string(args[2])
+	min_S, max_S := string(args[2]), string(args[1])
 	min, err := SortedSet.ParseLexBorder(min_S)
 	if err != nil {
 		return protocol.MakeErrReply(err.Error())

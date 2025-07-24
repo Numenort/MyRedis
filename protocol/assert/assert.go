@@ -69,6 +69,21 @@ func AssertStatusReply(t *testing.T, actual myredis.Reply, expected string) {
 	}
 }
 
+func AssertNotError(t *testing.T, result myredis.Reply) {
+	if result == nil {
+		t.Errorf("result is nil %s", printStack())
+		return
+	}
+	bytes := result.ToBytes()
+	if len(bytes) == 0 {
+		t.Errorf("result is empty %s", printStack())
+		return
+	}
+	if bytes[0] == '-' {
+		t.Errorf("result is err protocol %s", printStack())
+	}
+}
+
 func AssertMultiBulkReply(t *testing.T, actual myredis.Reply, expected []string) {
 	multiBulkReply, ok := actual.(*protocol.MultiBulkReply)
 	if !ok {
