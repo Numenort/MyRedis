@@ -1,6 +1,9 @@
 package database
 
-import "myredis/lib/utils"
+import (
+	"myredis/lib/utils"
+	"strconv"
+)
 
 // 获取 write keys / read keys
 // 用于 multi 事务时，使用乐观锁进行加锁
@@ -123,4 +126,34 @@ func rollbackSetMembers(db *DB, key string, members ...string) []CmdLine {
 		}
 	}
 	return undoCmdLines
+}
+
+func rollbackZSetFields(db *DB, key string, fields ...string) []CmdLine {
+	var undoCmdLine [][][]byte
+	zset, errReply := db.getAsSortedSet(key)
+	if errReply != nil {
+		return nil
+	}
+	if zset == nil {
+		undoCmdLine = append(undoCmdLine,
+			utils.ToCmdLine("DEL"),
+		)
+		return undoCmdLine
+	}
+
+	for _, field := range fields {
+		elem, ok := zset.Get(field)
+		// 如果执行命令前不存在，为 ADD 指令
+		if !ok {
+			undoCmdLine = append(undoCmdLine,
+				utils.ToCmdLine("ZREM", key, field),
+			)
+		} else {
+			score := strconv.FormatFloat(elem.Score, 'f', -1, 64)
+			undoCmdLine = append(undoCmdLine,
+				utils.ToCmdLine("ZADD", key, score, field),
+			)
+		}
+	}
+	return undoCmdLine
 }
