@@ -39,6 +39,7 @@ func (db *DB) getOrInitSortedSet(key string) (sortedSet *sortedset.SortedSet, in
 	return sortedSet, inited, nil
 }
 
+// 处理 ZADD 命令，向有序集合添加一个或多个成员及其分数。示例：ZADD myzset 100 "member1" 200 "member2"
 func execZAdd(db *DB, args [][]byte) myredis.Reply {
 	if len(args)%2 != 1 {
 		return protocol.MakeSyntaxErrReply()
@@ -73,6 +74,7 @@ func execZAdd(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeIntReply(int64(i))
 }
 
+// 为 ZADD 命令生成回滚操作
 func undoZAdd(db *DB, args [][]byte) []CmdLine {
 	key := string(args[0])
 	size := (len(args) - 1) / 2
@@ -83,6 +85,7 @@ func undoZAdd(db *DB, args [][]byte) []CmdLine {
 	return rollbackZSetFields(db, key, fields...)
 }
 
+// 处理 ZSCORE 命令，获取有序集合中指定成员的分数。示例：ZSCORE myzset "member1"
 func execZScore(db *DB, args [][]byte) myredis.Reply {
 	key := string(args[0])
 	member := string(args[1])
@@ -104,6 +107,7 @@ func execZScore(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeBulkReply([]byte(value))
 }
 
+// 处理 ZRANK 命令，获取有序集合中指定成员的排名（分数从低到高，0-based）。示例：ZRANK myzset "member1"
 func execZRank(db *DB, args [][]byte) myredis.Reply {
 	key := string(args[0])
 	member := string(args[1])
@@ -124,6 +128,7 @@ func execZRank(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeIntReply(rank)
 }
 
+// 处理 ZREVRANK 命令，获取有序集合中指定成员的逆序排名（分数从高到低，0-based）。示例：ZREVRANK myzset "member1"
 func execZRevRank(db *DB, args [][]byte) myredis.Reply {
 	key := string(args[0])
 	member := string(args[1])
@@ -144,6 +149,7 @@ func execZRevRank(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeIntReply(rank)
 }
 
+// 处理 ZCARD 命令，获取有序集合的成员数量。示例：ZCARD myzset
 func execZCard(db *DB, args [][]byte) myredis.Reply {
 	key := string(args[0])
 
@@ -211,6 +217,7 @@ func range0(db *DB, key string, start int64, end int64, withScores bool, desc bo
 	return protocol.MakeMultiBulkReply(result)
 }
 
+// 处理 ZRANGE 命令，通过索引范围获取有序集合的成员。示例：ZRANGE myzset 0 -1 WITHSCORES
 func execZRange(db *DB, args [][]byte) myredis.Reply {
 	if len(args) != 3 && len(args) != 4 {
 		return protocol.MakeErrReply("ERR wrong number of arguments for 'zrange' command")
@@ -234,6 +241,7 @@ func execZRange(db *DB, args [][]byte) myredis.Reply {
 	return range0(db, key, start, end, withScores, false)
 }
 
+// 处理 ZREVRANGE 命令，通过索引范围逆序获取有序集合的成员。示例：ZREVRANGE myzset 0 10
 func execZRevRange(db *DB, args [][]byte) myredis.Reply {
 	if len(args) != 3 && len(args) != 4 {
 		return protocol.MakeErrReply("ERR wrong number of arguments for 'zrange' command")
@@ -257,6 +265,7 @@ func execZRevRange(db *DB, args [][]byte) myredis.Reply {
 	return range0(db, key, start, end, withScores, true)
 }
 
+// 处理 ZCOUNT 命令，统计有序集合中指定分数范围内的成员数量。示例：ZCOUNT myzset 0 100
 func execZCount(db *DB, args [][]byte) myredis.Reply {
 	key := string(args[0])
 
@@ -310,6 +319,7 @@ func rangeByScore0(db *DB, key string, min SortedSet.Border, max SortedSet.Borde
 	return protocol.MakeMultiBulkReply(result)
 }
 
+// 处理 ZRANGEBYSCORE 命令，通过分数范围获取有序集合的成员。示例：ZRANGEBYSCORE myzset (10 100 LIMIT 0 5
 func execZRangeByScore(db *DB, args [][]byte) myredis.Reply {
 	if len(args) < 3 {
 		return protocol.MakeErrReply("ERR wrong number of arguments for 'zrangebyscore' command")
@@ -354,6 +364,7 @@ func execZRangeByScore(db *DB, args [][]byte) myredis.Reply {
 	return rangeByScore0(db, key, min, max, offset, limit, withScores, false)
 }
 
+// 处理 ZREVRANGEBYSCORE 命令，通过分数范围逆序获取有序集合的成员。示例：ZREVRANGEBYSCORE myzset 100 0 WITHSCORES
 func execZRevRangeByScore(db *DB, args [][]byte) myredis.Reply {
 	if len(args) < 3 {
 		return protocol.MakeErrReply("ERR wrong number of arguments for 'zrangebyscore' command")
@@ -398,6 +409,7 @@ func execZRevRangeByScore(db *DB, args [][]byte) myredis.Reply {
 	return rangeByScore0(db, key, min, max, offset, limit, withScores, true)
 }
 
+// 处理 ZREMRANGEBYSCORE 命令，通过分数范围移除有序集合中的成员。示例：ZREMRANGEBYSCORE myzset -inf (100
 func execZRemRangeByScore(db *DB, args [][]byte) myredis.Reply {
 	if len(args) < 3 {
 		return protocol.MakeErrReply("ERR wrong number of arguments for 'zremrangebyscore' command")
@@ -426,6 +438,7 @@ func execZRemRangeByScore(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeIntReply(removed)
 }
 
+// 处理 ZREMRANGEBYRANK 命令，通过排名范围移除有序集合中的成员。示例：ZREMRANGEBYRANK myzset 0 5
 func execZRemRangeByRank(db *DB, args [][]byte) myredis.Reply {
 	if len(args) < 3 {
 		return protocol.MakeErrReply("ERR wrong number of arguments for 'zremrangebyrank' command")
@@ -474,6 +487,7 @@ func execZRemRangeByRank(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeIntReply(removed)
 }
 
+// 处理 ZPOPMIN 命令，移除并返回有序集合中分数最小的成员。示例：ZPOPMIN myzset 2
 func execZPopMin(db *DB, args [][]byte) myredis.Reply {
 	key := string(args[0])
 	count := 1
@@ -504,6 +518,7 @@ func execZPopMin(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeMultiBulkReply(result)
 }
 
+// 处理 ZREM 命令，从有序集合中移除一个或多个成员。示例：ZREM myzset "member1" "member2"
 func execZRem(db *DB, args [][]byte) myredis.Reply {
 	key := string(args[0])
 	sortedSet, errReply := db.getAsSortedSet(key)
@@ -528,6 +543,7 @@ func execZRem(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeIntReply(removed)
 }
 
+// 为 ZREM 命令生成回滚操作
 func undoZRem(db *DB, args [][]byte) []CmdLine {
 	key := string(args[0])
 	filed := make([]string, len(args)-1)
@@ -537,6 +553,7 @@ func undoZRem(db *DB, args [][]byte) []CmdLine {
 	return rollbackZSetFields(db, key, filed...)
 }
 
+// 处理 ZINCRBY 命令，增加有序集合中指定成员的分数。示例：ZINCRBY myzset 1.5 "member1"
 func execZIncrBy(db *DB, args [][]byte) myredis.Reply {
 	key := string(args[0])
 	rawDelta := string(args[1])
@@ -563,12 +580,14 @@ func execZIncrBy(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeBulkReply(bytes)
 }
 
+// 为 ZINCRBY 命令生成回滚操作
 func undoZIncr(db *DB, args [][]byte) []CmdLine {
 	key := string(args[0])
 	member := string(args[1])
 	return rollbackZSetFields(db, key, member)
 }
 
+// 处理 ZLEXCOUNT 命令，统计有序集合中指定字典序范围内的成员数量。示例：ZLEXCOUNT myzset [a [c
 func execZLexCount(db *DB, args [][]byte) myredis.Reply {
 	key := string(args[0])
 	sortedset, errReply := db.getAsSortedSet(key)
@@ -593,6 +612,7 @@ func execZLexCount(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeIntReply(count)
 }
 
+// 处理 ZRANGEBYLEX 命令，通过字典序范围获取有序集合的成员。示例：ZRANGEBYLEX myzset [a [c LIMIT 0 10
 func execZRangeByLex(db *DB, args [][]byte) myredis.Reply {
 	size := len(args)
 	if size > 3 && strings.ToUpper(string(args[3])) != "LIMIT" {
@@ -650,6 +670,7 @@ func execZRangeByLex(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeMultiBulkReply(result)
 }
 
+// 处理 ZREVRANGEBYLEX 命令，通过字典序范围逆序获取有序集合的成员。示例：ZREVRANGEBYLEX myzset [c [a
 func execZRevRangeByLex(db *DB, args [][]byte) myredis.Reply {
 	size := len(args)
 	if size > 3 && strings.ToUpper(string(args[3])) != "LIMIT" {
@@ -707,6 +728,7 @@ func execZRevRangeByLex(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeMultiBulkReply(result)
 }
 
+// 处理 ZREMRANGEBYLEX 命令，通过字典序范围移除有序集合中的成员。示例：ZREMRANGEBYLEX myzset [a (c
 func execZRemRangeByLex(db *DB, args [][]byte) myredis.Reply {
 	size := len(args)
 	if size != 3 {
@@ -736,6 +758,7 @@ func execZRemRangeByLex(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeIntReply(count)
 }
 
+// 处理 ZSCAN 命令，迭代有序集合中的成员。示例：ZSCAN myzset 0 MATCH user:* COUNT 100
 func execZScan(db *DB, args [][]byte) myredis.Reply {
 	var count int = 10
 	var pattern string = "*"
