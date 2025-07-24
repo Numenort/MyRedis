@@ -9,8 +9,6 @@ import (
 	"myredis/protocol"
 	"strconv"
 	"strings"
-
-	"github.com/hashicorp/hcl/v2/ext/tryfunc"
 )
 
 func (db *DB) getAsSortedSet(key string) (*sortedset.SortedSet, protocol.ErrorReply) {
@@ -439,7 +437,7 @@ func execZRemRangeByRank(db *DB, args [][]byte) myredis.Reply {
 		return errReply
 	}
 	if sortedset == nil {
-		return protocol.MakeMultiBulkReply()
+		return protocol.MakeEmptyMultiBulkReply()
 	}
 
 	start, err := strconv.ParseInt(string(args[1]), 10, 64)
@@ -492,7 +490,7 @@ func execZPopMin(db *DB, args [][]byte) myredis.Reply {
 		return errReply
 	}
 	if sortedset == nil {
-		return protocol.MakeMultiBulkReply()
+		return protocol.MakeEmptyMultiBulkReply()
 	}
 	removed := sortedset.PopMin(count)
 	result := make([][]byte, len(removed)*2)
