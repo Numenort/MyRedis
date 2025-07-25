@@ -59,48 +59,50 @@ func NewPersister(db database.DBEngine, filename string, load bool, fsync string
 		currentDB:   0,
 	}
 	// 如果加载 aof file
-	if load {
-		Persister.LoadAof(0)
-	}
+	return Persister, nil
 }
 
-// maxBytes: 最大可读字节
-func (persister *Persister) LoadAof(maxBytes int) {
-	// 加载 AOF 文件时关闭该通道防止冲突
-	aofChan := persister.aofChan
-	persister.aofChan = nil
-	defer func(aofChan chan *payload) {
-		persister.aofChan = aofChan
-	}(aofChan)
+// // maxBytes: 最大可读字节
+// func (persister *Persister) LoadAof(maxBytes int) {
+// 	// 加载 AOF 文件时关闭该通道防止冲突
+// 	aofChan := persister.aofChan
+// 	persister.aofChan = nil
+// 	defer func(aofChan chan *payload) {
+// 		persister.aofChan = aofChan
+// 	}(aofChan)
 
-	file, err := os.Open(persister.aofFilename)
-	// 如果是路径问题
-	if err != nil {
-		if _, ok := err.(*os.PathError); ok {
-			return
-		}
-		logger.Warn(err)
-		return
-	}
-	defer file.Close()
+// 	file, err := os.Open(persister.aofFilename)
+// 	// 如果是路径问题
+// 	if err != nil {
+// 		if _, ok := err.(*os.PathError); ok {
+// 			return
+// 		}
+// 		logger.Warn(err)
+// 		return
+// 	}
+// 	defer file.Close()
 
-	// 尝试加载 rdb 快照
-	decoder := rdb.NewDecoder(file)
-	err = persister.db.LoadRDB(decoder)
-	if err != nil {
-		// 没有 rdb 快照，从 0 开始
-		file.Seek(0, io.SeekStart)
-	} else {
-		_, _ = file.Seek(int64(decoder.GetReadCount())+1, io.SeekStart)
-		maxBytes = maxBytes - decoder.GetReadCount()
-	}
-	var reader io.Reader
-	if maxBytes > 0 {
-		reader = io.LimitReader(reader, int64(maxBytes))
-	} else {
-		reader = file
-	}
+// 	// 尝试加载 rdb 快照
+// 	decoder := rdb.NewDecoder(file)
+// 	err = persister.db.LoadRDB(decoder)
+// 	if err != nil {
+// 		// 没有 rdb 快照，从 0 开始
+// 		file.Seek(0, io.SeekStart)
+// 	} else {
+// 		_, _ = file.Seek(int64(decoder.GetReadCount())+1, io.SeekStart)
+// 		maxBytes = maxBytes - decoder.GetReadCount()
+// 	}
+// 	var reader io.Reader
+// 	if maxBytes > 0 {
+// 		reader = io.LimitReader(reader, int64(maxBytes))
+// 	} else {
+// 		reader = file
+// 	}
 
-	ch := parser.ParseStream(reader)
+// 	ch := parser.ParseStream(reader)
 
+// }
+
+func (persister *Persister) generateAof(ctx *RewriteContext) error {
+	return nil
 }
