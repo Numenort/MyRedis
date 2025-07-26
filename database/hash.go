@@ -5,6 +5,7 @@ import (
 	"myredis/interface/database"
 	"myredis/interface/myredis"
 	"myredis/protocol"
+	"strconv"
 )
 
 func (db *DB) getAsDict(key string) (Dict.Dict, protocol.ErrorReply) {
@@ -245,6 +246,140 @@ func execHMGet(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeMultiBulkReply(result)
 }
 
+func execHGetAll(db *DB, args [][]byte) myredis.Reply {
+	key := string(args[0])
+
+	dict, errReply := db.getAsDict(key)
+	if errReply != nil {
+		return errReply
+	}
+	if dict == nil {
+		return protocol.MakeEmptyMultiBulkReply()
+	}
+
+	size := dict.Len()
+
+	result := make([][]byte, size*2)
+	i := 0
+	dict.ForEach(func(key string, val interface{}) bool {
+		result[i] = []byte(key)
+		i++
+		result[i], _ = val.([]byte)
+		i++
+		return true
+	})
+	return protocol.MakeMultiBulkReply(result[:i])
+}
+
+func execHKeys(db *DB, args [][]byte) myredis.Reply {
+	key := string(args[0])
+
+	dict, errReply := db.getAsDict(key)
+	if errReply != nil {
+		return errReply
+	}
+	if dict == nil {
+		return protocol.MakeEmptyMultiBulkReply()
+	}
+
+	members := make([][]byte, dict.Len())
+	i := 0
+	dict.ForEach(func(key string, val interface{}) bool {
+		members[i] = []byte(key)
+		i++
+		return true
+	})
+	return protocol.MakeMultiBulkReply(members[:i])
+}
+
+func execHVals(db *DB, args [][]byte) myredis.Reply {
+	key := string(args[0])
+
+	dict, errReply := db.getAsDict(key)
+	if errReply != nil {
+		return errReply
+	}
+	if dict == nil {
+		return protocol.MakeEmptyMultiBulkReply()
+	}
+
+	values := make([][]byte, dict.Len())
+	i := 0
+	dict.ForEach(func(key string, val interface{}) bool {
+		values[i], _ = val.([]byte)
+		i++
+		return true
+	})
+	return protocol.MakeMultiBulkReply(values[:i])
+}
+
+func execHIncrBy(db *DB, args [][]byte) myredis.Reply {
+	key := string(args[0])
+	member := string(args[1])
+	delta, err := strconv.ParseInt(string(args[2]), 10, 64)
+	if err != nil {
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
+	}
+	dict, _, errReply := db.getOrInitDict(key)
+	if errReply != nil {
+		return errReply
+	}
+
+	value, exists := dict.Get(member)
+	if !exists {
+		dict.Put(member, args[2])
+		return protocol.MakeBulkReply(args[2])
+	}
+	val, err := strconv.ParseInt(string(value.([]byte)), 10, 64)
+	if err != nil {
+		protocol.MakeErrReply("ERR hash value is not an integer")
+	}
+
+	val += delta
+	bytes := []byte(strconv.FormatInt(val, 10))
+	dict.Put(key, bytes)
+	return protocol.MakeBulkReply(bytes)
+}
+
+func undoHIncr(db *DB, args [][]byte) []CmdLine {
+	key := string(args[0])
+	member := string(args[1])
+	return rollbackHSetFields(db, key, member)
+}
+
+func execHIncrByFloat(db *DB, args [][]byte) myredis.Reply {
+	key := string(args[0])
+	member := string(args[1])
+	delta, err := strconv.ParseFloat(string(args[2]), 64)
+	if err != nil {
+		return protocol.MakeErrReply("ERR value is not a valid float")
+	}
+
+	dict, _, errReply := db.getOrInitDict(key)
+	if errReply != nil {
+		return errReply
+	}
+
+	value, exists := dict.Get(member)
+	if !exists {
+		dict.Put(member, args[2])
+		return protocol.MakeBulkReply(args[2])
+	}
+	val, err := strconv.ParseFloat(string(value.([]byte)), 64)
+	if err != nil {
+		protocol.MakeErrReply("ERR hash value is not an integer")
+	}
+
+	val += delta
+	bytes := []byte(strconv.FormatFloat(val, 'f', -1, 64))
+	dict.Put(key, bytes)
+	return protocol.MakeBulkReply(bytes)
+}
+
+func execHRandMember(db *DB, args [][]byte) myredis.Reply {
+
+}
+
 func init() {
 	registerCommand("HSet", execHSet, writeFirstKey, undoHSet, 4, flagWrite).
 		attachCommandExtra([]string{redisFlagWrite, redisFlagDenyOOM, redisFlagFast}, 1, 1, 1)
@@ -252,8 +387,14 @@ func init() {
 		attachCommandExtra([]string{redisFlagWrite, redisFlagDenyOOM, redisFlagFast}, 1, 1, 1)
 	registerCommand("HGet", execHGet, readFirstKey, nil, 3, flagReadOnly).
 		attachCommandExtra([]string{redisFlagReadonly, redisFlagFast}, 1, 1, 1)
+	registerCommand("HGetAll", execHGetAll, readFirstKey, nil, 2, flagReadOnly).
+		attachCommandExtra([]string{redisFlagReadonly, redisFlagRandom}, 1, 1, 1)
 	registerCommand("HExists", execHExists, readFirstKey, nil, 3, flagReadOnly).
 		attachCommandExtra([]string{redisFlagReadonly, redisFlagFast}, 1, 1, 1)
+	registerCommand("HKeys", execHKeys, readFirstKey, nil, 2, flagReadOnly).
+		attachCommandExtra([]string{redisFlagReadonly, redisFlagSortForScript}, 1, 1, 1)
+	registerCommand("HVals", execHVals, readFirstKey, nil, 2, flagReadOnly).
+		attachCommandExtra([]string{redisFlagReadonly, redisFlagSortForScript}, 1, 1, 1)
 
 	registerCommand("HDel", execHDel, writeFirstKey, undoHDel, -3, flagWrite).
 		attachCommandExtra([]string{redisFlagWrite, redisFlagFast}, 1, 1, 1)
@@ -267,4 +408,10 @@ func init() {
 		attachCommandExtra([]string{redisFlagWrite, redisFlagDenyOOM, redisFlagFast}, 1, 1, 1)
 	registerCommand("HMGet", execHMGet, readFirstKey, nil, -3, flagReadOnly).
 		attachCommandExtra([]string{redisFlagReadonly, redisFlagFast}, 1, 1, 1)
+
+	registerCommand("HIncrBy", execHIncrBy, writeFirstKey, undoHIncr, 4, flagWrite).
+		attachCommandExtra([]string{redisFlagWrite, redisFlagDenyOOM, redisFlagFast}, 1, 1, 1)
+	registerCommand("HIncrByFloat", execHIncrByFloat, writeFirstKey, undoHIncr, 4, flagWrite).
+		attachCommandExtra([]string{redisFlagWrite, redisFlagDenyOOM, redisFlagFast}, 1, 1, 1)
+
 }
