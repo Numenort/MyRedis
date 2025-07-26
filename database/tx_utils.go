@@ -157,3 +157,33 @@ func rollbackZSetFields(db *DB, key string, fields ...string) []CmdLine {
 	}
 	return undoCmdLine
 }
+
+func rollbackHSetFields(db *DB, key string, members ...string) []CmdLine {
+	var undoCmdLines [][][]byte
+	HSet, errReply := db.getAsDict(key)
+	if errReply != nil {
+		return nil
+	}
+	if HSet == nil {
+		undoCmdLines = append(undoCmdLines,
+			utils.ToCmdLine("DEL", key),
+		)
+		return undoCmdLines
+	}
+	for _, field := range members {
+		entity, ok := HSet.Get(field)
+		if !ok {
+			// 之前不存在，即新增
+			undoCmdLines = append(undoCmdLines,
+				utils.ToCmdLine("HDEL", key, field),
+			)
+		} else {
+			// 之前存在，即修改，取之前的值保存
+			value, _ := entity.([]byte)
+			undoCmdLines = append(undoCmdLines,
+				utils.ToCmdLine("HSET", key, field, string(value)),
+			)
+		}
+	}
+	return undoCmdLines
+}
