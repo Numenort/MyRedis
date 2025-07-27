@@ -83,51 +83,6 @@ func TestUndoHSet(t *testing.T) {
 	assert.AssertBulkReply(t, result, value)
 }
 
-func TestHDel(t *testing.T) {
-	testDB.Flush()
-	size := 100
-
-	// set values
-	key := utils.RandString(10)
-	fields := make([]string, size)
-	for i := 0; i < size; i++ {
-		value := utils.RandString(10)
-		field := strconv.Itoa(i)
-		fields[i] = field
-		testDB.Exec(nil, utils.ToCmdLine("hset", key, field, value))
-	}
-
-	// test HDel
-	args := []string{key}
-	args = append(args, fields...)
-	actual := testDB.Exec(nil, utils.ToCmdLine2("hdel", args...))
-	if intResult, _ := actual.(*protocol.IntReply); intResult.Code != int64(len(fields)) {
-		t.Errorf("expected %d, actually %d", len(fields), intResult.Code)
-	}
-
-	actual = testDB.Exec(nil, utils.ToCmdLine("hlen", key))
-	if intResult, _ := actual.(*protocol.IntReply); intResult.Code != int64(0) {
-		t.Errorf("expected %d, actually %d", 0, intResult.Code)
-	}
-}
-
-func TestUndoHDel(t *testing.T) {
-	testDB.Flush()
-	key := utils.RandString(10)
-	field := utils.RandString(10)
-	value := utils.RandString(10)
-
-	testDB.Exec(nil, utils.ToCmdLine("hset", key, field, value))
-	cmdLine := utils.ToCmdLine("hdel", key, field)
-	undoCmdLines := undoHDel(testDB, cmdLine[1:])
-	testDB.Exec(nil, cmdLine)
-	for _, cmdLine := range undoCmdLines {
-		testDB.Exec(nil, cmdLine)
-	}
-	result := testDB.Exec(nil, utils.ToCmdLine("hget", key, field))
-	assert.AssertBulkReply(t, result, value)
-}
-
 func TestHMSet(t *testing.T) {
 	testDB.Flush()
 	size := 100
@@ -178,6 +133,174 @@ func TestUndoHMSet(t *testing.T) {
 	assert.AssertBulkReply(t, result, value)
 }
 
+func TestHGetAll(t *testing.T) {
+	testDB.Flush()
+	size := 100
+	key := utils.RandString(10)
+	fields := make([]string, size)
+	valueSet := make(map[string]bool, size)
+	valueMap := make(map[string]string)
+	all := make([]string, 0)
+	for i := 0; i < size; i++ {
+		fields[i] = utils.RandString(10)
+		value := utils.RandString(10)
+		all = append(all, fields[i], value)
+		valueMap[fields[i]] = value
+		valueSet[value] = true
+		execHSet(testDB, utils.ToCmdLine(key, fields[i], value))
+	}
+
+	// test HGetAll
+	result := testDB.Exec(nil, utils.ToCmdLine("hgetall", key))
+	multiBulk, ok := result.(*protocol.MultiBulkReply)
+	if !ok {
+		t.Errorf("expected MultiBulkReply, actually %s", string(result.ToBytes()))
+	}
+	if 2*len(fields) != len(multiBulk.Args) {
+		t.Errorf("expected %d items , actually %d ", 2*len(fields), len(multiBulk.Args))
+	}
+	for i := range fields {
+		field := string(multiBulk.Args[2*i])
+		actual := string(multiBulk.Args[2*i+1])
+		expected, ok := valueMap[field]
+		if !ok {
+			t.Errorf("unexpected field %s", field)
+			continue
+		}
+		if actual != expected {
+			t.Errorf("expected %s, actually %s", expected, actual)
+		}
+	}
+
+	// test HKeys
+	result = testDB.Exec(nil, utils.ToCmdLine("hkeys", key))
+	multiBulk, ok = result.(*protocol.MultiBulkReply)
+	if !ok {
+		t.Errorf("expected MultiBulkReply, actually %s", string(result.ToBytes()))
+	}
+	if len(fields) != len(multiBulk.Args) {
+		t.Errorf("expected %d items , actually %d ", len(fields), len(multiBulk.Args))
+	}
+	for _, v := range multiBulk.Args {
+		field := string(v)
+		if _, ok := valueMap[field]; !ok {
+			t.Errorf("unexpected field %s", field)
+		}
+	}
+
+	// test HVals
+	result = testDB.Exec(nil, utils.ToCmdLine("hvals", key))
+	multiBulk, ok = result.(*protocol.MultiBulkReply)
+	if !ok {
+		t.Errorf("expected MultiBulkReply, actually %s", string(result.ToBytes()))
+	}
+	if len(fields) != len(multiBulk.Args) {
+		t.Errorf("expected %d items , actually %d ", len(fields), len(multiBulk.Args))
+	}
+	for _, v := range multiBulk.Args {
+		value := string(v)
+		_, ok := valueSet[value]
+		if !ok {
+			t.Errorf("unexpected value %s", value)
+		}
+	}
+
+	// test HRandField
+	// test HRandField count of 0 is handled correctly -- "emptyarray"
+	result = testDB.Exec(nil, utils.ToCmdLine("hrandfield", key, "0"))
+	multiBulk, ok = result.(*protocol.MultiBulkReply)
+	if !ok {
+		resultBytes := string(result.ToBytes())
+		if resultBytes != "*0\r\n" {
+			t.Errorf("expected MultiBulkReply, actually %s", resultBytes)
+		}
+	}
+
+	// test HRandField count > size
+	result = testDB.Exec(nil, utils.ToCmdLine("hrandfield", key, strconv.Itoa(size+100)))
+	multiBulk, ok = result.(*protocol.MultiBulkReply)
+	if !ok {
+		t.Errorf("expected MultiBulkReply, actually %s", string(result.ToBytes()))
+	}
+	if len(fields) != len(multiBulk.Args) {
+		t.Errorf("expected %d items , actually %d ", len(fields), len(multiBulk.Args))
+	}
+
+	// test HRandField count > size withvalues
+	result = testDB.Exec(nil, utils.ToCmdLine("hrandfield", key, strconv.Itoa(size+100), "withvalues"))
+	multiBulk, ok = result.(*protocol.MultiBulkReply)
+	if !ok {
+		t.Errorf("expected MultiBulkReply, actually %s", string(result.ToBytes()))
+	}
+	if 2*len(fields) != len(multiBulk.Args) {
+		t.Errorf("expected %d items , actually %d ", 2*len(fields), len(multiBulk.Args))
+	}
+
+	// test HRandField count < size
+	result = testDB.Exec(nil, utils.ToCmdLine("hrandfield", key, strconv.Itoa(-size-10)))
+	multiBulk, ok = result.(*protocol.MultiBulkReply)
+	if !ok {
+		t.Errorf("expected MultiBulkReply, actually %s", string(result.ToBytes()))
+	}
+	if len(fields)+10 != len(multiBulk.Args) {
+		t.Errorf("expected %d items , actually %d ", len(fields)+10, len(multiBulk.Args))
+	}
+
+	// test HRandField count < size withvalues
+	result = testDB.Exec(nil, utils.ToCmdLine("hrandfield", key, strconv.Itoa(-size-10), "withvalues"))
+	multiBulk, ok = result.(*protocol.MultiBulkReply)
+	if !ok {
+		t.Errorf("expected MultiBulkReply, actually %s", string(result.ToBytes()))
+	}
+	if 2*(len(fields)+10) != len(multiBulk.Args) {
+		t.Errorf("expected %d items , actually %d ", 2*(len(fields)+10), len(multiBulk.Args))
+	}
+}
+
+func TestHDel(t *testing.T) {
+	testDB.Flush()
+	size := 100
+
+	// set values
+	key := utils.RandString(10)
+	fields := make([]string, size)
+	for i := 0; i < size; i++ {
+		value := utils.RandString(10)
+		field := strconv.Itoa(i)
+		fields[i] = field
+		testDB.Exec(nil, utils.ToCmdLine("hset", key, field, value))
+	}
+
+	// test HDel
+	args := []string{key}
+	args = append(args, fields...)
+	actual := testDB.Exec(nil, utils.ToCmdLine2("hdel", args...))
+	if intResult, _ := actual.(*protocol.IntReply); intResult.Code != int64(len(fields)) {
+		t.Errorf("expected %d, actually %d", len(fields), intResult.Code)
+	}
+
+	actual = testDB.Exec(nil, utils.ToCmdLine("hlen", key))
+	if intResult, _ := actual.(*protocol.IntReply); intResult.Code != int64(0) {
+		t.Errorf("expected %d, actually %d", 0, intResult.Code)
+	}
+}
+
+func TestUndoHDel(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	field := utils.RandString(10)
+	value := utils.RandString(10)
+
+	testDB.Exec(nil, utils.ToCmdLine("hset", key, field, value))
+	cmdLine := utils.ToCmdLine("hdel", key, field)
+	undoCmdLines := undoHDel(testDB, cmdLine[1:])
+	testDB.Exec(nil, cmdLine)
+	for _, cmdLine := range undoCmdLines {
+		testDB.Exec(nil, cmdLine)
+	}
+	result := testDB.Exec(nil, utils.ToCmdLine("hget", key, field))
+	assert.AssertBulkReply(t, result, value)
+}
 func TestHIncrBy(t *testing.T) {
 	testDB.Flush()
 
@@ -226,4 +349,49 @@ func TestUndoHIncr(t *testing.T) {
 	}
 	result := testDB.Exec(nil, utils.ToCmdLine("hget", key, field))
 	assert.AssertBulkReply(t, result, "1")
+}
+
+func TestHScan(t *testing.T) {
+	testDB.Flush()
+	hashKey := "test:hash"
+	for i := 0; i < 3; i++ {
+		key := string(rune(i))
+		value := key
+		testDB.Exec(nil, utils.ToCmdLine("hset", hashKey, "a"+key, value))
+	}
+	for i := 0; i < 3; i++ {
+		key := string(rune(i))
+		value := key
+		testDB.Exec(nil, utils.ToCmdLine("hset", hashKey, "b"+key, value))
+	}
+
+	result := testDB.Exec(nil, utils.ToCmdLine("hscan", hashKey, "0", "count", "10"))
+	cursorStr := string(result.(*protocol.MultiRawReply).Replies[0].(*protocol.BulkReply).Arg)
+	cursor, err := strconv.Atoi(cursorStr)
+	if err == nil {
+		if cursor != 0 {
+			t.Errorf("expect cursor 0, actually %d", cursor)
+			return
+		}
+	} else {
+		t.Errorf("get scan result error")
+		return
+	}
+
+	// test hscan 0 match a*
+	result = testDB.Exec(nil, utils.ToCmdLine("hscan", hashKey, "0", "match", "a*"))
+	returnKeys := result.(*protocol.MultiRawReply).Replies[1].(*protocol.MultiBulkReply).Args
+	i := 0
+	for i < len(returnKeys) {
+		if i%2 != 0 {
+			i++
+			continue // pass value
+		}
+		key := string(returnKeys[i])
+		i++
+		if key[0] != 'a' {
+			t.Errorf("The key %s should match a*", key)
+			return
+		}
+	}
 }

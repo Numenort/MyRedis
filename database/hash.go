@@ -444,7 +444,7 @@ func execHRandMember(db *DB, args [][]byte) myredis.Reply {
 			return protocol.MakeMultiBulkReply(result)
 		}
 	} else if count < 0 {
-		members := dict.RandomDistinctKeys(-count)
+		members := dict.RandomKeys(-count)
 		size := len(members)
 		if withValues == 0 {
 			result := make([][]byte, size)
@@ -473,14 +473,14 @@ func execHScan(db *DB, args [][]byte) myredis.Reply {
 		for i := 2; i < len(args); i++ {
 			arg := strings.ToLower(string(args[i]))
 			if arg == "count" {
-				tempCount, err := strconv.Atoi(string(arg[i+1]))
+				tempCount, err := strconv.Atoi(string(args[i+1]))
 				if err != nil {
 					return protocol.MakeSyntaxErrReply()
 				}
 				count = tempCount
 				i++
 			} else if arg == "match" {
-				pattern = string(arg[i+1])
+				pattern = string(args[i+1])
 				i++
 			} else {
 				return protocol.MakeSyntaxErrReply()
