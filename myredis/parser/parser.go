@@ -18,12 +18,14 @@ type Payload struct {
 	Err  error
 }
 
+// 从输入流中异步解析 Redis 协议，返回结果通道
 func ParseStream(reader io.Reader) <-chan *Payload {
 	ch := make(chan *Payload)
 	go parse0(reader, ch)
 	return ch
 }
 
+// 将字节数组中的 Redis 协议数据全部解析为 Reply 列表
 func ParseBytes(data []byte) ([]myredis.Reply, error) {
 	ch := make(chan *Payload)
 	reader := bytes.NewReader(data)
@@ -47,6 +49,8 @@ func ParseBytes(data []byte) ([]myredis.Reply, error) {
 }
 
 // reads data from []byte and return the first payload
+//
+// 解析字节数组中的第一个 Redis 协议单元
 func ParseOne(data []byte) (myredis.Reply, error) {
 	ch := make(chan *Payload)
 	reader := bytes.NewReader(data)
@@ -58,6 +62,7 @@ func ParseOne(data []byte) (myredis.Reply, error) {
 	return payload.Data, nil
 }
 
+// 从 reader 读取数据并逐步解析为协议单元，通过 channel 向外发送解析结果或错误，支持流式处理
 func parse0(rawReader io.Reader, ch chan<- *Payload) {
 	defer func() {
 		if err := recover(); err != nil {
