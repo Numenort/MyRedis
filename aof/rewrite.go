@@ -10,6 +10,14 @@ import (
 	"strconv"
 )
 
+/* 重写所需实例，包含 AOF 文件名称以及临时数据库 */
+func (persister *Persister) newRewriteHandler() *Persister {
+	h := &Persister{}
+	h.aofFilename = persister.aofFilename
+	h.db = persister.tmpDBMaker()
+	return h
+}
+
 /*
 重写操作：
 

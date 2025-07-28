@@ -32,7 +32,7 @@ type Persister struct {
 	cancel context.CancelFunc
 	/* 数据库实例，用于执行命令 */
 	db database.DBEngine
-	/* 用于 AOF 重写过程中创建临时数据库实例 */
+	/* 用于 AOF 重写过程中创建临时数据库实例，通过加载 AOF 文件实现 */
 	tmpDBMaker func() database.DBEngine
 	/* 接收写入 AOF 的命令 */
 	aofChan     chan *payload
@@ -105,4 +105,8 @@ func NewPersister(db database.DBEngine, filename string, load bool, fsync string
 
 func (persister *Persister) generateAof(ctx *RewriteContext) error {
 	return nil
+}
+
+func (persister *Persister) LoadAof(maxBytes int) {
+
 }

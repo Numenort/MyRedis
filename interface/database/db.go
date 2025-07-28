@@ -32,6 +32,7 @@ type DBEngine interface {
 	GetExpiration(dbIndex int, key string) *time.Time
 	SetKeyInsertedCallback(cb KeyEventCallback)
 	SetKeyDeletedCallback(cb KeyEventCallback)
+	ForEach(dbIndex int, callback func(key string, data *DataEntity, expiration *time.Time) bool)
 }
 
 type DataEntity struct {
