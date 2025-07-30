@@ -1,6 +1,7 @@
 package wait
 
 import (
+	"context"
 	"sync"
 	"time"
 )
@@ -21,17 +22,24 @@ func (w *Wait) Wait() {
 	w.wg.Wait()
 }
 
+// 等待超时后返回 true，否则返回 false
 func (w *Wait) WaitWithTimeout(timeout time.Duration) bool {
-	c := make(chan struct{}, 1)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return w.waitWithTimeoutDuration(ctx)
+}
+
+func (w *Wait) waitWithTimeoutDuration(ctx context.Context) bool {
+	done := make(chan struct{})
 	go func() {
-		defer close(c)
+		// 等待完成后发送关闭信号
+		defer close(done)
 		w.Wait()
-		c <- struct{}{}
 	}()
 	select {
-	case <-c:
+	case <-done:
 		return false
-	case <-time.After(timeout):
+	case <-ctx.Done():
 		return true
 	}
 }
