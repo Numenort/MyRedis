@@ -25,7 +25,7 @@ func NewSimpleConn() *SimpleConn {
 
 func (c *SimpleConn) Write(b []byte) (int, error) {
 	if c.closed {
-		return 0, nil
+		return 0, io.EOF
 	}
 	// 保证并发安全，使用互斥锁
 	c.mu.Lock()
@@ -65,6 +65,13 @@ func (c *SimpleConn) Read(p []byte) (int, error) {
 	return n, nil
 }
 
+func (c *SimpleConn) Close() error {
+	c.closed = true
+	// 通知所有协程连接已关闭
+	c.notify()
+	return nil
+}
+
 // 用于写协程通知读协程有新数据可读或者关闭连接
 func (c *SimpleConn) notify() {
 	// 如果有读进程正在等待
@@ -85,7 +92,7 @@ func (c *SimpleConn) wait(offset int) {
 	// 并发访问 offset
 	c.mu.Lock()
 	// 如果有新的数据，不等了
-	if c.offset != c.offset {
+	if c.offset != offset {
 		return
 	}
 	if c.waiting == nil {
@@ -97,4 +104,19 @@ func (c *SimpleConn) wait(offset int) {
 	c.mu.Unlock()
 	<-waiting
 	logger.Debug(fmt.Sprintf("waiting %p finish", waiting))
+}
+
+// 清空 Buffer，此时无数据可读
+func (c *SimpleConn) Clean() {
+	c.waiting = make(chan struct{})
+	c.buf = nil
+	c.offset = 0
+}
+
+func (c *SimpleConn) Bytes() []byte {
+	return c.buf
+}
+
+func (c *SimpleConn) RemoteAddr() string {
+	return ""
 }

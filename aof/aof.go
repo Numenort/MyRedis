@@ -6,6 +6,7 @@ import (
 	"myredis/interface/database"
 	"myredis/lib/logger"
 	"myredis/lib/utils"
+	"myredis/myredis/connection"
 	"myredis/myredis/parser"
 	"myredis/protocol"
 	"os"
@@ -177,6 +178,8 @@ func (persister *Persister) LoadAof(maxBytes int) {
 	}
 	// 从 AOF 文件流解析 redis 协议，需要为 MultiBulkReply
 	channel := parser.ParseStream(reader)
+	// 用于重建数据库的临时连接
+	simpleConn := connection.NewSimpleConn()
 	// 监听 redis 协议
 	for ch := range channel {
 		if ch.Err != nil {
@@ -197,7 +200,7 @@ func (persister *Persister) LoadAof(maxBytes int) {
 			continue
 		}
 		// 执行对应命令，重建数据库
-		res := persister.db.Exec(nil, reply.Args)
+		res := persister.db.Exec(simpleConn, reply.Args)
 		if protocol.IsErrorReply(res) {
 			logger.Error("exec err", string(res.ToBytes()))
 		}
