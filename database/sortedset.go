@@ -6,6 +6,7 @@ import (
 	SortedSet "myredis/datastruct/sortedset"
 	"myredis/interface/database"
 	"myredis/interface/myredis"
+	"myredis/lib/utils"
 	"myredis/protocol"
 	"strconv"
 	"strings"
@@ -71,6 +72,7 @@ func execZAdd(db *DB, args [][]byte) myredis.Reply {
 			i++
 		}
 	}
+	db.addAof(utils.ToCmdLine3("zadd", args...))
 	return protocol.MakeIntReply(int64(i))
 }
 
@@ -437,6 +439,9 @@ func execZRemRangeByScore(db *DB, args [][]byte) myredis.Reply {
 	}
 
 	removed := sortedset.RemoveRange(min, max)
+	if removed > 0 {
+		db.addAof(utils.ToCmdLine3("zremrangebyscore", args...))
+	}
 	return protocol.MakeIntReply(removed)
 }
 
@@ -486,6 +491,9 @@ func execZRemRangeByRank(db *DB, args [][]byte) myredis.Reply {
 	}
 
 	removed := sortedset.RemoveByRank(start, end)
+	if removed > 0 {
+		db.addAof(utils.ToCmdLine3("zremrangebyrank", args...))
+	}
 	return protocol.MakeIntReply(removed)
 }
 
@@ -518,6 +526,9 @@ func execZPopMin(db *DB, args [][]byte) myredis.Reply {
 		result[i] = []byte(score)
 		i++
 	}
+	if len(removed) > 0 {
+		db.addAof(utils.ToCmdLine3("zpopmin", args...))
+	}
 	return protocol.MakeMultiBulkReply(result)
 }
 
@@ -542,6 +553,9 @@ func execZRem(db *DB, args [][]byte) myredis.Reply {
 		if sortedSet.Remove(field) {
 			removed++
 		}
+	}
+	if removed > 0 {
+		db.addAof(utils.ToCmdLine3("zrem", args...))
 	}
 	return protocol.MakeIntReply(removed)
 }
@@ -575,11 +589,13 @@ func execZIncrBy(db *DB, args [][]byte) myredis.Reply {
 	element, exists := sortedSet.Get(member)
 	if !exists {
 		sortedSet.Add(member, delta)
+		db.addAof(utils.ToCmdLine3("zincrby", args...))
 		return protocol.MakeBulkReply(args[1])
 	}
 	score := element.Score + delta
 	sortedSet.Add(member, score)
 	bytes := []byte(strconv.FormatFloat(score, 'f', -1, 64))
+	db.addAof(utils.ToCmdLine3("zincrby", args...))
 	return protocol.MakeBulkReply(bytes)
 }
 

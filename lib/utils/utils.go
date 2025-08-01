@@ -59,12 +59,22 @@ func ToCmdLine(cmd ...string) [][]byte {
 	return args
 }
 
-// 将 command 和 args 命令转为 CmdLine 类型
+// 将 command 和 字符串类型的 args 命令转为 CmdLine 类型
 func ToCmdLine2(command string, args ...string) [][]byte {
 	result := make([][]byte, len(args)+1)
 	result[0] = []byte(command)
 	for i, arg := range args {
 		result[i+1] = []byte(arg)
+	}
+	return result
+}
+
+// 将 command 和 [][]byte类型的 args 命令转为 CmdLine 类型
+func ToCmdLine3(command string, args ...[]byte) [][]byte {
+	result := make([][]byte, len(args)+1)
+	result[0] = []byte(command)
+	for i, arg := range args {
+		result[i+1] = arg
 	}
 	return result
 }

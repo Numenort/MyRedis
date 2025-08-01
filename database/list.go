@@ -135,6 +135,7 @@ func execLPop(db *DB, args [][]byte) myredis.Reply {
 	if list.Len() == 0 {
 		db.Remove(key)
 	}
+	db.addAof(utils.ToCmdLine3("lpop", args...))
 	return protocol.MakeBulkReply(val)
 }
 
@@ -197,7 +198,7 @@ func execLPush(db *DB, args [][]byte) myredis.Reply {
 	for _, value := range values {
 		list.Insert(0, value)
 	}
-
+	db.addAof(utils.ToCmdLine3("lpush", args...))
 	return protocol.MakeIntReply(int64(list.Len()))
 }
 
@@ -234,6 +235,7 @@ func execLPushX(db *DB, args [][]byte) myredis.Reply {
 	for _, value := range values {
 		list.Insert(0, value)
 	}
+	db.addAof(utils.ToCmdLine3("lpushx", args...))
 	return protocol.MakeIntReply(int64(list.Len()))
 }
 
@@ -339,6 +341,9 @@ func execLRem(db *DB, args [][]byte) myredis.Reply {
 	if list.Len() == 0 {
 		db.Remove(key)
 	}
+	if removed > 0 {
+		db.addAof(utils.ToCmdLine3("lrem", args...))
+	}
 	return protocol.MakeIntReply(int64(removed))
 }
 
@@ -374,6 +379,7 @@ func execLSet(db *DB, args [][]byte) myredis.Reply {
 	}
 
 	list.Set(index, value)
+	db.addAof(utils.ToCmdLine3("lset", args...))
 	return protocol.MakeOkReply()
 }
 
@@ -451,6 +457,7 @@ func execRPop(db *DB, args [][]byte) myredis.Reply {
 		if list.Len() == 0 {
 			db.Remove(key)
 		}
+		db.addAof(utils.ToCmdLine3("rpop", args...))
 		return protocol.MakeMultiBulkReply(vals)
 	}
 	// 未设置删除数量
@@ -458,6 +465,7 @@ func execRPop(db *DB, args [][]byte) myredis.Reply {
 	if list.Len() == 0 {
 		db.Remove(key)
 	}
+	db.addAof(utils.ToCmdLine3("rpop", args...))
 	return protocol.MakeBulkReply(val)
 }
 
@@ -535,7 +543,7 @@ func execRPopLPush(db *DB, args [][]byte) myredis.Reply {
 	if sourceList.Len() == 0 {
 		db.Remove(sourceKey)
 	}
-
+	db.addAof(utils.ToCmdLine3("rpoplpush", args...))
 	return protocol.MakeBulkReply(val)
 }
 
@@ -581,7 +589,7 @@ func execRPush(db *DB, args [][]byte) myredis.Reply {
 	for _, value := range values {
 		list.Add(value)
 	}
-
+	db.addAof(utils.ToCmdLine3("rpush", args...))
 	return protocol.MakeIntReply(int64(list.Len()))
 }
 
@@ -616,6 +624,7 @@ func execRPushX(db *DB, args [][]byte) myredis.Reply {
 	for _, value := range values {
 		list.Add(value)
 	}
+	db.addAof(utils.ToCmdLine3("rpushx", args...))
 	return protocol.MakeIntReply(int64(list.Len()))
 }
 
@@ -669,6 +678,7 @@ func execLTrim(db *DB, args [][]byte) myredis.Reply {
 	if list.Len() == 0 {
 		db.Remove(key)
 	}
+	db.addAof(utils.ToCmdLine3("ltrim", args...))
 	return protocol.MakeOkReply()
 }
 
@@ -713,7 +723,7 @@ func execLInsert(db *DB, args [][]byte) myredis.Reply {
 	} else if pos == "after" {
 		list.Insert(index+1, val)
 	}
-
+	db.addAof(utils.ToCmdLine3("linsert", args...))
 	return protocol.MakeIntReply(int64(list.Len()))
 }
 

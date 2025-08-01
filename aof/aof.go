@@ -88,6 +88,11 @@ func NewPersister(db database.DBEngine, filename string, load bool, fsyncStrateg
 	persister.aofFile = aofFile
 	persister.aofChan = make(chan *payload)
 	persister.aofFinshed = make(chan struct{})
+	persister.listeners = make(map[Listener]struct{})
+	// 启动一个 goroutine，用于写入 AOF 文件
+	go func() {
+		persister.listenCmdLine()
+	}()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	persister.ctx = ctx

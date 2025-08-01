@@ -2,6 +2,7 @@ package database
 
 import (
 	"math/bits"
+	"myredis/aof"
 	"myredis/datastruct/bitmap"
 	"myredis/interface/database"
 	"myredis/interface/myredis"
@@ -134,9 +135,13 @@ func execGetEX(db *DB, args [][]byte) myredis.Reply {
 		if ttl != unlimitedTTL {
 			expireTime := time.Now().Add(time.Duration(ttl) * time.Millisecond)
 			db.Expire(key, expireTime)
-			// TODO: Aof 持久化
+			db.addAof(aof.MakeExpiredCmd(key, expireTime).Args)
+			// DONE: Aof 持久化
 		} else {
+			// 如果不设置过期时间，移除可能的过期时间
 			db.Persist(key)
+			// 记录对应执行的该命令
+			db.addAof(utils.ToCmdLine3("persist", args[0]))
 		}
 	}
 	return protocol.MakeBulkReply(bytes)
@@ -231,9 +236,12 @@ func execSet(db *DB, args [][]byte) myredis.Reply {
 		if ttl != unlimitedTTL {
 			expireTime := time.Now().Add(time.Duration(ttl) * time.Millisecond)
 			db.Expire(key, expireTime)
+			db.addAof(utils.ToCmdLine3("set", args[0], args[1]))
+			db.addAof(aof.MakeExpiredCmd(key, expireTime).Args)
 			// TODO: 持久化操作
 		} else {
 			db.Persist(key)
+			db.addAof(utils.ToCmdLine3("set", args...))
 		}
 	}
 	// 操作成功
@@ -252,7 +260,7 @@ func execSetNX(db *DB, args [][]byte) myredis.Reply {
 		Data: value,
 	}
 	res := db.data.PutIfAbsentWithLock(key, entity)
-	// TODO: 加入恢复日志
+	db.addAof(utils.ToCmdLine3("setnx", args...))
 	return protocol.MakeIntReply(int64(res))
 }
 
@@ -278,6 +286,8 @@ func execSetEX(db *DB, args [][]byte) myredis.Reply {
 	db.PutEntity(key, entity)
 	expireTime := time.Now().Add(time.Duration(ttl) * time.Millisecond)
 	db.Expire(key, expireTime)
+	db.addAof(utils.ToCmdLine3("setex", args...))
+	db.addAof(aof.MakeExpiredCmd(key, expireTime).Args)
 	return &protocol.OkReply{}
 }
 
@@ -300,7 +310,8 @@ func execPSetEX(db *DB, args [][]byte) myredis.Reply {
 
 	db.PutEntity(key, entity)
 	expireTime := time.Now().Add(time.Duration(ttlArg) * time.Millisecond)
-	db.Expire(key, expireTime)
+	db.addAof(utils.ToCmdLine3("setex", args...))
+	db.addAof(aof.MakeExpiredCmd(key, expireTime).Args)
 	return &protocol.OkReply{}
 }
 
@@ -343,6 +354,7 @@ func execMSet(db *DB, args [][]byte) myredis.Reply {
 		value := values[i]
 		db.PutEntity(key, &database.DataEntity{Data: value})
 	}
+	db.addAof(utils.ToCmdLine3("mset", args...))
 	return &protocol.OkReply{}
 }
 
@@ -406,6 +418,7 @@ func execMSetNX(db *DB, args [][]byte) myredis.Reply {
 		value := values[i]
 		db.PutEntity(key, &database.DataEntity{Data: value})
 	}
+	db.addAof(utils.ToCmdLine3("msetnx", args...))
 	return protocol.MakeIntReply(1)
 }
 
@@ -422,7 +435,7 @@ func execGetSet(db *DB, args [][]byte) myredis.Reply {
 
 	db.PutEntity(key, &database.DataEntity{Data: value})
 	db.Persist(key)
-
+	db.addAof(utils.ToCmdLine3("set", args...))
 	// 如果旧值不存在，返回 null 回复
 	if oldValue == nil {
 		return new(protocol.NullBulkReply)
@@ -444,7 +457,7 @@ func execGetDel(db *DB, args [][]byte) myredis.Reply {
 		return new(protocol.NullBulkReply)
 	}
 	db.Remove(key)
-
+	db.addAof(utils.ToCmdLine3("del", args...))
 	return protocol.MakeBulkReply(old)
 }
 
@@ -463,11 +476,12 @@ func execIncr(db *DB, args [][]byte) myredis.Reply {
 			return protocol.MakeErrReply("ERR value is not an integer or out of range")
 		}
 		db.PutEntity(key, &database.DataEntity{Data: []byte(strconv.FormatInt(val+1, 10))})
+		db.addAof(utils.ToCmdLine3("incr", args...))
 		return protocol.MakeIntReply(val + 1)
 	}
 	// 如果值不存在，那么设置为 1
 	db.PutEntity(key, &database.DataEntity{Data: []byte("1")})
-
+	db.addAof(utils.ToCmdLine3("incr", args...))
 	return protocol.MakeIntReply(1)
 }
 
@@ -492,11 +506,13 @@ func execIncrBy(db *DB, args [][]byte) myredis.Reply {
 			return protocol.MakeErrReply("ERR value is not an integer or out of range")
 		}
 		db.PutEntity(key, &database.DataEntity{Data: []byte(strconv.FormatInt(val+data, 10))})
+		db.addAof(utils.ToCmdLine3("incrby", args...))
 		return protocol.MakeIntReply(val + data)
 	}
 
 	// 如果值不存在，那么设置为 value
 	db.PutEntity(key, &database.DataEntity{Data: args[1]})
+	db.addAof(utils.ToCmdLine3("incrby", args...))
 	return protocol.MakeIntReply(data)
 }
 
@@ -520,9 +536,11 @@ func execIncrByFloat(db *DB, args [][]byte) myredis.Reply {
 		}
 		resultBytes := []byte(strconv.FormatFloat(val+data, 'f', -1, 64))
 		db.PutEntity(key, &database.DataEntity{Data: resultBytes})
+		db.addAof(utils.ToCmdLine3("incrbyfloat", args...))
 		return protocol.MakeBulkReply(resultBytes)
 	}
 	db.PutEntity(key, &database.DataEntity{Data: args[1]})
+	db.addAof(utils.ToCmdLine3("incrbyfloat", args...))
 	return protocol.MakeBulkReply(args[1])
 }
 
@@ -539,9 +557,11 @@ func execDecr(db *DB, args [][]byte) myredis.Reply {
 			return protocol.MakeErrReply("ERR value is not an integer or out of range")
 		}
 		db.PutEntity(key, &database.DataEntity{Data: []byte(strconv.FormatInt(val-1, 10))})
+		db.addAof(utils.ToCmdLine3("decr", args...))
 		return protocol.MakeIntReply(val - 1)
 	}
 	db.PutEntity(key, &database.DataEntity{Data: []byte("-1")})
+	db.addAof(utils.ToCmdLine3("decr", args...))
 	return protocol.MakeIntReply(-1)
 }
 
@@ -565,11 +585,13 @@ func execDecrBy(db *DB, args [][]byte) myredis.Reply {
 			return protocol.MakeErrReply("ERR value is not an integer or out of range")
 		}
 		db.PutEntity(key, &database.DataEntity{Data: []byte(strconv.FormatInt(val-data, 10))})
+		db.addAof(utils.ToCmdLine3("decrby", args...))
 		return protocol.MakeIntReply(val - data)
 	}
 	// key 的值不存在
 	valueStr := strconv.FormatInt(-data, 10)
 	db.PutEntity(key, &database.DataEntity{Data: []byte(valueStr)})
+	db.addAof(utils.ToCmdLine3("decrby", args...))
 	return protocol.MakeIntReply(-data)
 }
 
@@ -597,6 +619,7 @@ func execAppend(db *DB, args [][]byte) myredis.Reply {
 	db.PutEntity(key, &database.DataEntity{
 		Data: bytes,
 	})
+	db.addAof(utils.ToCmdLine3("append", args...))
 	return protocol.MakeIntReply(int64(len(bytes)))
 }
 
@@ -634,6 +657,7 @@ func execSetRange(db *DB, args [][]byte) myredis.Reply {
 	db.PutEntity(key, &database.DataEntity{
 		Data: bytes,
 	})
+	db.addAof(utils.ToCmdLine3("setRange", args...))
 	return protocol.MakeIntReply(int64(len(bytes)))
 }
 
@@ -693,6 +717,7 @@ func execSetBit(db *DB, args [][]byte) myredis.Reply {
 	former := bitmaps.GetBit(offset)
 	bitmaps.SetBit(offset, v)
 	db.PutEntity(key, &database.DataEntity{Data: bitmaps.ToBytes()})
+	db.addAof(utils.ToCmdLine3("setBit", args...))
 	return protocol.MakeIntReply(int64(former))
 }
 

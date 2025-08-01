@@ -4,6 +4,7 @@ import (
 	HashSet "myredis/datastruct/set"
 	"myredis/interface/database"
 	"myredis/interface/myredis"
+	"myredis/lib/utils"
 	"myredis/protocol"
 	"strconv"
 	"strings"
@@ -58,6 +59,7 @@ func execSAdd(db *DB, args [][]byte) myredis.Reply {
 	for _, member := range members {
 		count += set.Add(string(member))
 	}
+	db.addAof(utils.ToCmdLine3("sadd", args...))
 	return protocol.MakeIntReply(int64(count))
 }
 
@@ -110,6 +112,9 @@ func execSRem(db *DB, args [][]byte) myredis.Reply {
 	if set.Len() == 0 {
 		db.Remove(key)
 	}
+	if count > 0 {
+		db.addAof(utils.ToCmdLine3("srem", args...))
+	}
 	return protocol.MakeIntReply(int64(count))
 }
 
@@ -148,7 +153,9 @@ func execSPop(db *DB, args [][]byte) myredis.Reply {
 		set.Remove(member)
 		result[i] = []byte(member)
 	}
-
+	if count > 0 {
+		db.addAof(utils.ToCmdLine3("spop", args...))
+	}
 	return protocol.MakeMultiBulkReply(result)
 }
 
@@ -253,6 +260,7 @@ func execSInterStore(db *DB, args [][]byte) myredis.Reply {
 	db.PutEntity(dest, &database.DataEntity{
 		Data: result,
 	})
+	db.addAof(utils.ToCmdLine3("sinterstore", args...))
 	return protocol.MakeIntReply(int64(result.Len()))
 }
 
@@ -295,7 +303,7 @@ func execSUnionStore(db *DB, args [][]byte) myredis.Reply {
 	db.PutEntity(dest, &database.DataEntity{
 		Data: result,
 	})
-
+	db.addAof(utils.ToCmdLine3("sunionstore", args...))
 	return protocol.MakeIntReply(int64(result.Len()))
 }
 
@@ -341,6 +349,7 @@ func execSDiffStore(db *DB, args [][]byte) myredis.Reply {
 	db.PutEntity(dest, &database.DataEntity{
 		Data: result,
 	})
+	db.addAof(utils.ToCmdLine3("sdiffstore", args...))
 	return protocol.MakeIntReply(int64(result.Len()))
 }
 

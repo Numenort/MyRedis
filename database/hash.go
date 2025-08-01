@@ -4,6 +4,7 @@ import (
 	Dict "myredis/datastruct/dict"
 	"myredis/interface/database"
 	"myredis/interface/myredis"
+	"myredis/lib/utils"
 	"myredis/protocol"
 	"strconv"
 	"strings"
@@ -49,6 +50,7 @@ func execHSet(db *DB, args [][]byte) myredis.Reply {
 	}
 
 	result := dict.Put(member, value)
+	db.addAof(utils.ToCmdLine3("hset", args...))
 	return protocol.MakeIntReply(int64(result))
 }
 
@@ -70,6 +72,9 @@ func execHSetNX(db *DB, args [][]byte) myredis.Reply {
 	}
 
 	result := dict.PutIfAbsent(member, value)
+	if result > 0 {
+		db.addAof(utils.ToCmdLine3("hsetnx", args...))
+	}
 	return protocol.MakeIntReply(int64(result))
 }
 
@@ -139,6 +144,9 @@ func execHDel(db *DB, args [][]byte) myredis.Reply {
 	// 别忘了全部删除时要删除键
 	if dict.Len() == 0 {
 		db.Remove(key)
+	}
+	if deleted > 0 {
+		db.addAof(utils.ToCmdLine3("hdel", args...))
 	}
 
 	return protocol.MakeIntReply(int64(deleted))
@@ -212,6 +220,7 @@ func execHMSet(db *DB, args [][]byte) myredis.Reply {
 		value := values[i]
 		dict.Put(member, value)
 	}
+	db.addAof(utils.ToCmdLine3("hmset", args...))
 	return protocol.MakeOkReply()
 }
 
@@ -352,6 +361,7 @@ func execHIncrBy(db *DB, args [][]byte) myredis.Reply {
 	val += delta
 	bytes := []byte(strconv.FormatInt(val, 10))
 	dict.Put(key, bytes)
+	db.addAof(utils.ToCmdLine3("hincrby", args...))
 	return protocol.MakeBulkReply(bytes)
 }
 
@@ -388,6 +398,7 @@ func execHIncrByFloat(db *DB, args [][]byte) myredis.Reply {
 	val += delta
 	bytes := []byte(strconv.FormatFloat(val, 'f', -1, 64))
 	dict.Put(key, bytes)
+	db.addAof(utils.ToCmdLine3("hincrbyfloat", args...))
 	return protocol.MakeBulkReply(bytes)
 }
 
