@@ -40,7 +40,7 @@ func (persister *Persister) Rewrite() error {
 
 // 重写操作所需要的上下文
 type RewriteContext struct {
-	tempFile *os.File // 存储精简命令的 AOF 文件
+	tempFile *os.File // 存储精简命令的 AOF 文件，用于重写
 	fileSize int64
 	dbIndex  int // 开始重写时，当前数据库索引
 }

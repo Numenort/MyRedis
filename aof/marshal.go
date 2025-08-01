@@ -12,6 +12,7 @@ import (
 	"myredis/protocol"
 )
 
+// 将数据库实体转化为精简的命令行
 func EntityToCmd(key string, entity *database.DataEntity) *protocol.MultiBulkReply {
 	if entity == nil {
 		return nil
@@ -111,6 +112,7 @@ func zSetToCmd(key string, zset *SortedSet.SortedSet) *protocol.MultiBulkReply {
 
 var pExpireAtBytes = []byte("PEXPIREAT")
 
+// 将带过期时间的键转化为命令行
 func MakeExpiredCmd(key string, expireAt time.Time) *protocol.MultiBulkReply {
 	args := make([][]byte, 3)
 	args[0] = pExpireAtBytes

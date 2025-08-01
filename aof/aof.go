@@ -3,6 +3,7 @@ package aof
 import (
 	"context"
 	"io"
+	"myredis/config"
 	"myredis/interface/database"
 	"myredis/lib/logger"
 	"myredis/lib/utils"
@@ -56,7 +57,7 @@ type Persister struct {
 	/* fsync 策略 */
 	aofFsyncStrategy string
 	aofFinshed       chan struct{}
-	/* 用于暂停/恢复 AOF 写入 */
+	/* 用于暂停/恢复 AOF 写入，保护访问共享资源 */
 	pausingAof sync.Mutex
 	/* 记录当前的数据库编号，避免写入不必要的 SELECT 命令，减少数据库切换开销 */
 	currentDB int
@@ -98,8 +99,39 @@ func NewPersister(db database.DBEngine, filename string, load bool, fsyncStrateg
 	return persister, nil
 }
 
-func (persister *Persister) generateAof(ctx *RewriteContext) error {
-	return nil
+func (persister *Persister) RemoveListener(listener Listener) {
+	persister.pausingAof.Lock()
+	defer persister.pausingAof.Unlock()
+	delete(persister.listeners, listener)
+}
+
+// 将命令行保存到指定数据库中，通过 AOF 通道
+func (persister *Persister) SaveCmdLine(dbIndex int, cmdline CmdLine) {
+	if persister.aofChan == nil {
+		return
+	}
+	// 每执行一个命令，保存一次
+	if persister.aofFsyncStrategy == FsyncAlways {
+		payload := &payload{
+			cmdLine: cmdline,
+			dbIndex: dbIndex,
+		}
+		persister.WriteAof(payload)
+		return
+	}
+	// 利用 aofchan 异步发送数据
+	persister.aofChan <- &payload{
+		cmdLine: cmdline,
+		dbIndex: dbIndex,
+	}
+}
+
+// 监听通道，异步保存 AOF 文件
+func (persister *Persister) listenCmdLine() {
+	for payload := range persister.aofChan {
+		persister.WriteAof(payload)
+	}
+	persister.aofFinshed <- struct{}{}
 }
 
 func (persister *Persister) WriteAof(payload *payload) {
@@ -140,8 +172,9 @@ func (persister *Persister) WriteAof(payload *payload) {
 	}
 }
 
+// 加载 AOF 文件，重建数据库
 func (persister *Persister) LoadAof(maxBytes int) {
-	// 确保在加载 AOF 文件时的文件一致性
+	// 确保在加载 AOF 文件时的 aofChan 不会发送新的数据
 	aofChan := persister.aofChan
 	persister = nil
 	defer func(aofChan chan *payload) {
@@ -255,4 +288,37 @@ func (persister *Persister) Close() {
 	}
 	// 关闭 fsyncEverySecond 的扫描
 	persister.cancel()
+}
+
+// 用于重写过程中，将临时文件写入 AOF
+func (persister *Persister) generateAof(ctx *RewriteContext) error {
+	// 获取临时文件、临时保存实例
+	tempFile := ctx.tempFile
+	tempAofHandler := persister.newRewriteHandler()
+	// 加载临时文件
+	tempAofHandler.LoadAof(int(ctx.fileSize))
+	for i := 0; i < config.Properties.Databases; i++ {
+		// Select database
+		data := protocol.MakeMultiBulkReply(utils.ToCmdLine("SELECT", strconv.Itoa(i))).ToBytes()
+		_, err := tempFile.Write(data)
+		if err != nil {
+			return err
+		}
+		// 遍历每个数据库
+		tempAofHandler.db.ForEach(i, func(key string, entity *database.DataEntity, expiration *time.Time) bool {
+			cmd := EntityToCmd(key, entity)
+			// 写入维护数据库内容的最简命令
+			if cmd != nil {
+				_, _ = tempFile.Write(cmd.ToBytes())
+			}
+			if expiration != nil {
+				cmd := MakeExpiredCmd(key, *expiration)
+				if cmd != nil {
+					_, _ = tempFile.Write(cmd.ToBytes())
+				}
+			}
+			return true
+		})
+	}
+	return nil
 }

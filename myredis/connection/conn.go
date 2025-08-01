@@ -1,3 +1,4 @@
+// Package connection 提供了对客户端连接的封装，包括连接管理、订阅发布、事务支持等功能。
 package connection
 
 import (
@@ -15,30 +16,26 @@ const (
 )
 
 type Connection struct {
-	conn        net.Conn
-	sendingData wait.Wait
-	mu          sync.Mutex
-	flags       uint64
-	subs        map[string]bool
-	password    string
-	selectedDB  int
-	txErrors    []error
-	watching    map[string]uint32
-
-	queue [][][]byte
+	conn        net.Conn          // 底层网络连接
+	sendingData wait.Wait         // 控制写入操作的并发安全
+	mu          sync.Mutex        // 保护 subs 等字段的并发访问
+	flags       uint64            // 连接标志位：slave/master/multi 状态等
+	subs        map[string]bool   // 订阅的频道列表
+	password    string            // 客户端认证密码
+	selectedDB  int               // 当前选择的数据库编号
+	txErrors    []error           // 事务执行过程中发生的错误
+	watching    map[string]uint32 // WATCH 命令监视的键及其版本号
+	queue       [][][]byte        // 事务中排队的命令队列
 }
 
-// 新建连接池实现连接对象复用
-// 这并不是传统意义上的“连接池”（如数据库连接池），
-// 而是一个 对象池（Object Pool），用于复用 Connection 结构体的内存空间。
-// 它的设计目标是降低频繁创建和销毁连接对象带来的内存开销。
+// connObjPool 是一个对象池，用于复用 Connection 结构体实例，降低 GC 压力
 var connObjPool = sync.Pool{
 	New: func() interface{} {
 		return &Connection{}
 	},
 }
 
-// 新建连接
+// 新建连接，优先从对象池中获取
 func NewConn(conn net.Conn) *Connection {
 	connection, ok := connObjPool.Get().(*Connection)
 	if !ok {
@@ -63,7 +60,7 @@ func (c *Connection) Write(b []byte) (int, error) {
 	return c.conn.Write(b)
 }
 
-// 优雅关闭连接
+// 优雅关闭连接，最多等待 10 秒确保数据发送完成
 func (c *Connection) Close() error {
 	// 最多等待 10 秒
 	c.sendingData.WaitWithTimeout(10 * time.Second)
@@ -74,6 +71,7 @@ func (c *Connection) Close() error {
 		}
 	}
 
+	// 清理资源并放回对象池
 	c.subs = nil
 	c.password = ""
 	c.queue = nil
@@ -128,6 +126,8 @@ func (c *Connection) GetChannels() []string {
 	return channels
 }
 
+/* ---------- State Functions ----------*/
+
 func (c *Connection) SetMultiState(state bool) {
 	if !state {
 		c.watching = nil
@@ -162,6 +162,7 @@ func (c *Connection) GetPassword() string {
 	return c.password
 }
 
+// 获取事务中排队的命令行
 func (c *Connection) GetQueuedCmdLine() [][][]byte {
 	return c.queue
 }
@@ -174,6 +175,7 @@ func (c *Connection) ClearQueuedCmds() {
 	c.queue = nil
 }
 
+// 添加事务执行中的错误
 func (c *Connection) AddTxError(err error) {
 	c.txErrors = append(c.txErrors, err)
 }
@@ -182,6 +184,7 @@ func (c *Connection) GetTxErrors() []error {
 	return c.txErrors
 }
 
+// 获取当前 WATCH 监视的键及版本号
 func (c *Connection) GetWatching() map[string]uint32 {
 	if c.watching == nil {
 		c.watching = make(map[string]uint32)
