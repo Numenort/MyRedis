@@ -1,11 +1,11 @@
 package database
 
 import (
-	"container/list"
 	"fmt"
 	"math"
 	"myredis/aof"
 	"myredis/datastruct/dict"
+	"myredis/datastruct/list"
 	"myredis/datastruct/set"
 	"myredis/datastruct/sortedset"
 	"myredis/interface/myredis"
@@ -219,14 +219,14 @@ func execExpiredAt(db *DB, args [][]byte) myredis.Reply {
 }
 
 // execGetExpiredTime: 获取键 [KEY] 的过期时间点（Unix 时间戳，秒）。
-// 返回值: 过期时间戳 (>=0), -1 (永不过期), 0 (键不存在)
+// 返回值: 过期时间戳 (>=0), -1 (永不过期), -2 (键不存在)
 // 格式: EXPIRETIME [KEY]
 func execGetExpiredTime(db *DB, args [][]byte) myredis.Reply {
 	key := string(args[0])
 
 	_, exists := db.GetEntity(key)
 	if !exists {
-		return protocol.MakeIntReply(0)
+		return protocol.MakeIntReply(-2)
 	}
 
 	TTL, exists := db.ttlMap.Get(key)
@@ -284,14 +284,14 @@ func execPExpiredAt(db *DB, args [][]byte) myredis.Reply {
 }
 
 // execGetPExpiredTime: 获取键 [KEY] 的过期时间点（Unix 时间戳，毫秒）。
-// 返回值: 过期时间戳 (>=0), -1 (永不过期), 0 (键不存在)
+// 返回值: 过期时间戳 (>=0), -1 (永不过期), -2 (键不存在)
 // 格式: PEXPIRETIME [KEY]
 func execGetPExpiredTime(db *DB, args [][]byte) myredis.Reply {
 	key := string(args[0])
 
 	_, exists := db.GetEntity(key)
 	if !exists {
-		return protocol.MakeIntReply(0)
+		return protocol.MakeIntReply(-2)
 	}
 
 	TTL, exists := db.ttlMap.Get(key)
