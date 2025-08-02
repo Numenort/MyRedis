@@ -7,32 +7,33 @@ import (
 	"strconv"
 )
 
-var CRLF = "\r\n"
+var CRLF = "\r\n" // RESP 协议中的行尾分隔符
 
 /*
-BulkReply: 批量字符串回复
+BulkReply: 批量字符串回复，用于返回单个非空字符串
 */
 type BulkReply struct {
-	Arg []byte
+	Arg []byte // 实际数据内容
 }
 
-// 字符串回复
+// 创建字符串回复
 func MakeBulkReply(arg []byte) *BulkReply {
 	return &BulkReply{
 		Arg: arg,
 	}
 }
 
+// 序列化为 RESP 字节流
+// 示例: $5\r\nmamba\r\n，若 Arg 为 nil 则返回 $-1\r\n
 func (r *BulkReply) ToBytes() []byte {
 	if r.Arg == nil {
 		return nullBulkBytes
 	}
-	// $5\r\nmamba\r\n
 	return []byte("$" + strconv.Itoa(len(r.Arg)) + CRLF + string(r.Arg) + CRLF)
 }
 
 /*
-MultiBulkReply: 多个 Bulk 字符串组成的数组
+MultiBulkReply: 多个 Bulk 字符串组成的数组，用于命令参数或多个结果
 */
 type MultiBulkReply struct {
 	Args [][]byte
@@ -44,12 +45,12 @@ func MakeMultiBulkReply(args [][]byte) *MultiBulkReply {
 	}
 }
 
+// 示例：
 // *2\r\n
 // $5\r\n
 // hello\r\n
 // $5\r\n
 // world\r\n
-
 func (r *MultiBulkReply) ToBytes() []byte {
 	var buf bytes.Buffer
 
@@ -86,7 +87,9 @@ func (r *MultiBulkReply) ToBytes() []byte {
 	return buf.Bytes()
 }
 
-// 存储已经完成解析的 RESP 协议
+/*
+MultiRawReply: 包含多个任意类型 Reply 的数组回复
+*/
 type MultiRawReply struct {
 	Replies []myredis.Reply
 }
@@ -97,6 +100,7 @@ func MakeMultiRawReply(replies []myredis.Reply) *MultiRawReply {
 	}
 }
 
+// 将多个 Reply 拼接成 RESP 数组格式输出
 func (r *MultiRawReply) ToBytes() []byte {
 	argLen := len(r.Replies)
 	var buf bytes.Buffer
@@ -171,6 +175,9 @@ func IsErrorReply(reply myredis.Reply) bool {
 	return reply.ToBytes()[0] == '-'
 }
 
+// 尝试将 Reply 转换为 Go 的 error 类型
+//
+// 如果是错误回复则返回对应的 error，否则返回 nil
 func Try2ErrorReply(reply myredis.Reply) error {
 	str := string(reply.ToBytes())
 	if len(str) == 0 {

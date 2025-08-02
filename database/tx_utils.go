@@ -1,6 +1,7 @@
 package database
 
 import (
+	"myredis/aof"
 	"myredis/lib/utils"
 	"strconv"
 )
@@ -83,13 +84,16 @@ func rollbackFirstKey(db *DB, args [][]byte) []CmdLine {
 func rollbackGivenKeys(db *DB, keys ...string) []CmdLine {
 	var undoCmdLine [][][]byte
 	for _, key := range keys {
-		_, ok := db.GetEntity(key)
+		entity, ok := db.GetEntity(key)
+		// 之前不存在，直接删除
 		if !ok {
 			undoCmdLine = append(undoCmdLine,
 				utils.ToCmdLine("DEL", key))
 		} else {
+			// 之前存在，还原命令
 			undoCmdLine = append(undoCmdLine,
 				utils.ToCmdLine("DEL", key),
+				aof.EntityToCmd(key, entity).Args,
 				toTTLCmd(db, key).Args,
 			)
 		}
