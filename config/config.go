@@ -2,11 +2,14 @@ package config
 
 type ServerProperties struct {
 	Dir               string `cfg:"dir"`
-	AofUseRdbPreamble bool   `cfg:"aof-use-rdb-preamble"`
 	Databases         int    `cfg:"databases"`
+	AppendOnly        bool   `cfg:"appendonly"`
+	AppendFilename    string `cfg:"appendfilename"`
+	AofUseRdbPreamble bool   `cfg:"aof-use-rdb-preamble"`
+	AppendFsync       string `cfg:"appendfsync"`
 }
 
-var Properties ServerProperties
+var Properties *ServerProperties
 
 func GetTmpDir() string {
 	return Properties.Dir + "/tmp"

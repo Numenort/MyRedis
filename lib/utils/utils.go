@@ -119,3 +119,16 @@ func RandString(n int) string {
 	}
 	return string(b)
 }
+
+func RemoveDuplicates(inputs [][]byte) [][]byte {
+	uniqueMap := make(map[string]struct{})
+	var result [][]byte
+	for _, input := range inputs {
+		key := string(input)
+		if _, exists := uniqueMap[key]; !exists {
+			uniqueMap[key] = struct{}{}
+			result = append(result, input)
+		}
+	}
+	return result
+}

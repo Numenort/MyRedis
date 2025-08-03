@@ -479,7 +479,7 @@ func (dict *ConcurrentDict) DictScan(cursor int, count int, pattern string) ([][
 }
 
 func stringsToBytes(strSlice []string) [][]byte {
-	byteSlice := make([][]byte, 0)
+	byteSlice := make([][]byte, len(strSlice))
 	for i, str := range strSlice {
 		byteSlice[i] = []byte(str)
 	}
