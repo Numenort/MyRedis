@@ -1,3 +1,13 @@
+/*
+提供基于 GeoHash 的地理编码与邻近区域计算功能。
+
+主要实现以下功能：
+  - 计算两点间的球面距离（Haversine 公式）
+  - 根据搜索半径自动估算合适的 GeoHash 精度
+  - 将经纬度编码为 GeoHash 并获取其数值范围
+  - 获取指定坐标在给定半径内的 3x3 邻接 GeoHash 区域范围
+*/
+
 package geohash
 
 import "math"
