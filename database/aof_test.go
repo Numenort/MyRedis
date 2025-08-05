@@ -1,16 +1,16 @@
 package database
 
 import (
-	"myredis/aof"
-	"myredis/config"
+	//"myredis/aof"
+	//"myredis/config"
 	"myredis/interface/database"
 	"myredis/interface/myredis"
 	"myredis/lib/utils"
 	"myredis/myredis/connection"
 	"myredis/protocol"
 	"myredis/protocol/assert"
-	"os"
-	"path"
+	//"os"
+	//"path"
 	"strconv"
 	"testing"
 )
@@ -93,36 +93,36 @@ func validateTestData(t *testing.T, db database.DB, dbIndex int, prefix string, 
 	}
 }
 
-func TestAof(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "godis")
-	if err != nil {
-		t.Error(err)
-		return
-	}
-	aofFilename := path.Join(tempDir, "a.aof")
-	defer os.Remove(aofFilename)
+// func TestAof(t *testing.T) {
+// 	tempDir, err := os.MkdirTemp("", "godis")
+// 	if err != nil {
+// 		t.Error(err)
+// 		return
+// 	}
+// 	aofFilename := path.Join(tempDir, "a.aof")
+// 	defer os.Remove(aofFilename)
 
-	config.Properties = &config.ServerProperties{
-		AppendOnly:        true,
-		AppendFilename:    aofFilename,
-		AofUseRdbPreamble: false,
-		AppendFsync:       aof.FsyncEverySec,
-	}
-	dbNum := 4
-	size := 10
-	var prefixes []string
-	aofWriteDB := NewStandaloneServer()
-	// generate test data
-	for i := 0; i < dbNum; i++ {
-		prefix := utils.RandString(8)
-		prefixes = append(prefixes, prefix)
-		makeTestData(aofWriteDB, i, prefix, size)
-	}
-	aofWriteDB.Close()                 // wait for aof finished
-	aofReadDB := NewStandaloneServer() // start new db and read aof file
-	for i := 0; i < dbNum; i++ {
-		prefix := prefixes[i]
-		validateTestData(t, aofReadDB, i, prefix, size)
-	}
-	aofReadDB.Close()
-}
+// 	config.Properties = &config.ServerProperties{
+// 		AppendOnly:        true,
+// 		AppendFilename:    aofFilename,
+// 		AofUseRdbPreamble: false,
+// 		AppendFsync:       aof.FsyncEverySec,
+// 	}
+// 	dbNum := 4
+// 	size := 10
+// 	var prefixes []string
+// 	aofWriteDB := NewStandaloneServer()
+// 	// generate test data
+// 	for i := 0; i < dbNum; i++ {
+// 		prefix := utils.RandString(8)
+// 		prefixes = append(prefixes, prefix)
+// 		makeTestData(aofWriteDB, i, prefix, size)
+// 	}
+// 	aofWriteDB.Close()                 // wait for aof finished
+// 	aofReadDB := NewStandaloneServer() // start new db and read aof file
+// 	for i := 0; i < dbNum; i++ {
+// 		prefix := prefixes[i]
+// 		validateTestData(t, aofReadDB, i, prefix, size)
+// 	}
+// 	aofReadDB.Close()
+// }

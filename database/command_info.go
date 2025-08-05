@@ -14,4 +14,6 @@ const (
 	redisFlagFast = "fast"
 	// 脚本执行环境中需要确定性排序的命令
 	redisFlagSortForScript = "sortforscript"
+	// 键的位置不固定，需通过规则动态计算的命令
+	redisFlagMovableKeys = "movablekeys"
 )
