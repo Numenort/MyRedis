@@ -7,6 +7,8 @@ type ServerProperties struct {
 	AppendFilename    string `cfg:"appendfilename"`
 	AofUseRdbPreamble bool   `cfg:"aof-use-rdb-preamble"`
 	AppendFsync       string `cfg:"appendfsync"`
+	RequirePass       string `cfg:"requirepass"`
+	RDBFilename       string `cfg:"rdbfilename"`
 }
 
 var Properties *ServerProperties
