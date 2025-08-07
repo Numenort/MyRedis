@@ -240,7 +240,7 @@ func (node *Node) AddToRaft(redisAddr, raftAddr string) error {
 	return future.Error()
 }
 
-// 从 Raft 集群中移除某个节点
+// 从 Raft 集群中移除某个节点，只有 leader 可以执行
 //
 // 参数 redisAddr: 要移除的节点的 Redis 地址（即 Raft ID）
 func (node *Node) HandleEvict(redisAddr string) error {
