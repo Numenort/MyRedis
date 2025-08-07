@@ -31,7 +31,7 @@ import (
 )
 
 type FSM struct {
-	mu           sync.Mutex
+	mu           sync.RWMutex
 	Node2Slot    map[string][]uint32       // 节点 -> 槽位
 	Slot2Node    map[uint32]string         // 槽位 -> 节点
 	Migratings   map[string]*MigratingTask // 迁移任务
@@ -49,7 +49,8 @@ type MigratingTask struct {
 	Slots      []uint32 //需要迁移的槽位
 }
 
-// 表示节点属性，包含一个主节点及其从节点列表
+// 表示节点属性，包含主节点及其从节点列表
+// 主节点为 ""，即是一个从节点
 type MasterSlave struct {
 	MasterID string
 	Slaves   []string

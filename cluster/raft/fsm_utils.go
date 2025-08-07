@@ -113,3 +113,19 @@ func (fsm *FSM) failover(OldMasterID, NewMasterID string) {
 		Slaves:   newSlaves,
 	}
 }
+
+// 允许调用者在 FSM 的读锁保护下执行操作
+func (fsm *FSM) WithReadLock(fn func(fsm *FSM)) {
+	// 防止 FSM 读取时被修改
+	fsm.mu.RLock()
+	defer fsm.mu.RUnlock()
+	fn(fsm)
+}
+
+func (fsm *FSM) getMaster(id string) string {
+	master := ""
+	fsm.WithReadLock(func(fsm *FSM) {
+		master = fsm.SlaveMasters[id]
+	})
+	return master
+}
