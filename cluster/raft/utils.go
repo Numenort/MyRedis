@@ -16,3 +16,8 @@ func (node *Node) GetSlaves(id string) *MasterSlave {
 	defer node.FSM.mu.RUnlock()
 	return node.FSM.MasterSlaves[id]
 }
+
+func (node *Node) GetLeaderRedisAddress() string {
+	_, id := node.inner.LeaderWithID()
+	return string(id)
+}

@@ -6,6 +6,12 @@ import (
 )
 
 type Cluster struct {
-	raftNode raft.Node
-	db       database.DBEngine
+	raftNode    raft.Node
+	db          database.DBEngine
+	connections ConnectionFactory
+	config      *Config
+}
+
+type Config struct {
+	raft.RaftConfig
 }

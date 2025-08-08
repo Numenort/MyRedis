@@ -97,12 +97,12 @@ func (server *Server) LoadRDB(dec *core.Decoder) error {
 	return err
 }
 
-func NewPersister(db database.DBEngine, filename string, load bool, fsync string) (*aof.Persister, error) {
-	return aof.NewPersister(
-		db, filename, load, fsync, func() database.DBEngine {
-			return MakeAuxiliaryServer()
-		})
-}
+// func NewPersister(db database.DBEngine, filename string, load bool, fsync string) (*aof.Persister, error) {
+// 	return aof.NewPersister(
+// 		db, filename, load, fsync, func() database.DBEngine {
+// 			return MakeAuxiliaryServer()
+// 		})
+// }
 
 // AddAof 向 AOF 持久化器添加命令行记录，允许外部组件直接向 AOF 文件写入命令
 //

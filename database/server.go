@@ -72,5 +72,5 @@ func (server *Server) mustSelectDB(index int) *DB {
 }
 
 func (server *Server) Exec(client myredis.Connection, cmdLine [][]byte) myredis.Reply {
-
+	return nil
 }
