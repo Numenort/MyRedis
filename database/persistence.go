@@ -21,7 +21,7 @@ func (server *Server) loadRdbFile() error {
 	// 加载 RDB 文件
 	rdbFile, err := os.Open(config.Properties.RDBFilename)
 	if err != nil {
-		return fmt.Errorf("open rdb file failed " + err.Error())
+		return fmt.Errorf("open rdb file failed %v ", err.Error())
 	}
 	defer func() {
 		_ = rdbFile.Close()
@@ -30,7 +30,7 @@ func (server *Server) loadRdbFile() error {
 	decoder := rdb.NewDecoder(rdbFile)
 	err = server.LoadRDB(decoder)
 	if err != nil {
-		return fmt.Errorf("load rdb file failed " + err.Error())
+		return fmt.Errorf("load rdb file failed %v ", err.Error())
 	}
 	return nil
 }
@@ -97,12 +97,12 @@ func (server *Server) LoadRDB(dec *core.Decoder) error {
 	return err
 }
 
-// func NewPersister(db database.DBEngine, filename string, load bool, fsync string) (*aof.Persister, error) {
-// 	return aof.NewPersister(
-// 		db, filename, load, fsync, func() database.DBEngine {
-// 			return MakeAuxiliaryServer()
-// 		})
-// }
+func NewPersister(db database.DBEngine, filename string, load bool, fsync string) (*aof.Persister, error) {
+	return aof.NewPersister(
+		db, filename, load, fsync, func() database.DBEngine {
+			return MakeAuxiliaryServer()
+		})
+}
 
 // AddAof 向 AOF 持久化器添加命令行记录，允许外部组件直接向 AOF 文件写入命令
 //

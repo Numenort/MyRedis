@@ -280,3 +280,17 @@ func (db *DB) addVersion(keys ...string) {
 		db.versionMap.Put(key, versionCode)
 	}
 }
+
+// 对每个键值对调用回调函数
+func (db *DB) ForEach(callback func(key string, data *database.DataEntity, expiration *time.Time) bool) {
+	db.data.ForEach(func(key string, val interface{}) bool {
+		entity, _ := val.(*database.DataEntity)
+		var expiration *time.Time
+		rawExpireTime, ok := db.ttlMap.Get(key)
+		if ok {
+			expireTime, _ := rawExpireTime.(time.Time)
+			expiration = &expireTime
+		}
+		return callback(key, entity, expiration)
+	})
+}

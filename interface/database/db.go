@@ -23,7 +23,7 @@ type KeyEventCallback func(dbIndex int, key string, entity *DataEntity)
 type DBEngine interface {
 	DB
 	ExecWithLock(conn myredis.Connection, cmdLine [][]byte) myredis.Reply
-	ExecMulti(conn myredis.Connection, cmdLine [][]byte) myredis.Reply
+	ExecMulti(conn myredis.Connection, watching map[string]uint32, cmdLines []CmdLine) myredis.Reply
 	GetUndoLogs(dbIndex int, cmdLine [][]byte) []CmdLine
 	RWLocks(dbIndex int, writeKeys []string, readKeys []string)
 	RWUnLocks(dbIndex int, writeKeys []string, readKeys []string)

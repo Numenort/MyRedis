@@ -1,15 +1,20 @@
 package database
 
 import (
+	"fmt"
 	"myredis/aof"
 	"myredis/interface/database"
 	"myredis/interface/myredis"
+	"myredis/lib/logger"
 	"myredis/protocol"
 	"os"
+	"runtime/debug"
+	"strings"
 	"sync/atomic"
+	"time"
 )
 
-var myredisVersion string = "1.0.0"
+var mydisVersion string = "1.0.0"
 
 type Server struct {
 	dbSet     []*atomic.Value
@@ -71,6 +76,127 @@ func (server *Server) mustSelectDB(index int) *DB {
 	return selectDB
 }
 
-func (server *Server) Exec(client myredis.Connection, cmdLine [][]byte) myredis.Reply {
+func (server *Server) Exec(c myredis.Connection, cmdLine [][]byte) (result myredis.Reply) {
+	defer func() {
+		if err := recover(); err != nil {
+			logger.Warn(fmt.Sprintf("error occurs: %v\n%s", err, string(debug.Stack())))
+			result = &protocol.UnknownErrReply{}
+		}
+	}()
+
+	cmdName := strings.ToLower(string(cmdLine[0]))
+	if cmdName == "ping" {
+		return Ping(c, cmdLine[1:])
+	}
+	if cmdName == "auth" {
+		return Auth(c, cmdLine[1:])
+	}
+	if !isAuthenticated(c) {
+		return protocol.MakeErrReply("NOAUTH Authentication required")
+	}
+	if cmdName == "info" {
+		return Info(server, cmdLine[1:])
+	}
+	if cmdName == "dbsize" {
+		return Dbsize(c, server)
+	}
 	return nil
+}
+
+func (server *Server) AfterClientClose(c myredis.Connection) {
+
+}
+
+func (server *Server) Close() {
+
+}
+
+func (server *Server) ExecMulti(conn myredis.Connection, watching map[string]uint32, cmdLines []CmdLine) myredis.Reply {
+	// 连接实例中获取数据库 id
+	selectDB, errReply := server.selectDB(conn.GetDBIndex())
+	if errReply != nil {
+		return errReply
+	}
+	return selectDB.ExecMulti(conn, watching, cmdLines)
+}
+
+func (server *Server) ExecWithLock(conn myredis.Connection, cmdLine [][]byte) myredis.Reply {
+	selectDB, errReply := server.selectDB(conn.GetDBIndex())
+	if errReply != nil {
+		return errReply
+	}
+	return selectDB.execWithLock(cmdLine)
+}
+
+func (server *Server) ForEach(dbIndex int, callback func(key string, data *database.DataEntity, expiration *time.Time) bool) {
+	server.mustSelectDB(dbIndex).ForEach(callback)
+}
+
+func (server *Server) GetDBSize(dbIndex int) (int, int) {
+	db := server.mustSelectDB(dbIndex)
+	return db.data.Len(), db.ttlMap.Len()
+}
+
+func (server *Server) GetEntity(dbIndex int, key string) (*database.DataEntity, bool) {
+	db := server.mustSelectDB(dbIndex)
+	return db.GetEntity(key)
+}
+
+func (server *Server) GetExpiration(dbIndex int, key string) *time.Time {
+	db := server.mustSelectDB(dbIndex)
+	rawTTL, ok := db.ttlMap.Get(key)
+	if !ok {
+		return nil
+	}
+	ttlTime, _ := rawTTL.(time.Time)
+	return &ttlTime
+}
+
+func (server *Server) RWLocks(dbIndex int, writeKeys []string, readKeys []string) {
+	db := server.mustSelectDB(dbIndex)
+	db.RWLocks(writeKeys, readKeys)
+}
+
+func (server *Server) RWUnLocks(dbIndex int, writeKeys []string, readKeys []string) {
+	db := server.mustSelectDB(dbIndex)
+	db.RWUnLocks(writeKeys, readKeys)
+}
+
+func (server *Server) GetUndoLogs(dbIndex int, cmdLine [][]byte) []CmdLine {
+	return server.mustSelectDB(dbIndex).GetUndoLogs(cmdLine)
+}
+
+func (server *Server) SetKeyDeletedCallback(callback database.KeyEventCallback) {
+	server.deleteCallback = callback
+	for i := range server.dbSet {
+		db := server.mustSelectDB(i)
+		db.deleteCallback = callback
+	}
+}
+
+func (server *Server) SetKeyInsertedCallback(callback database.KeyEventCallback) {
+	server.deleteCallback = callback
+	for i := range server.dbSet {
+		db := server.mustSelectDB(i)
+		db.insertCallback = callback
+	}
+}
+
+func (server *Server) GetAvgTTL(dbIndex, randomKeyCount int) int64 {
+	var ttlCount int64
+	db := server.mustSelectDB(dbIndex)
+	keys := db.data.RandomKeys(randomKeyCount)
+	for _, key := range keys {
+		t := time.Now()
+		rawExpireTime, ok := db.ttlMap.Get(key)
+		if !ok {
+			continue
+		}
+		expireTime, _ := rawExpireTime.(time.Time)
+		subTime := expireTime.Sub(t).Microseconds()
+		if subTime > 0 {
+			ttlCount += subTime
+		}
+	}
+	return ttlCount / int64(len(keys))
 }
