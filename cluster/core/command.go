@@ -1,11 +1,13 @@
 package core
 
 import (
+	"fmt"
 	"myredis/config"
 	"myredis/database"
 	"myredis/interface/myredis"
 	"myredis/lib/logger"
 	"myredis/protocol"
+	"runtime/debug"
 	"strings"
 )
 
@@ -30,8 +32,13 @@ func (cluster *Cluster) Exec(c myredis.Connection, cmdLine [][]byte) (result myr
 		return database.Auth(c, cmdLine[1:])
 	}
 	if !isAuthenticated(c) {
-		return
+		return protocol.MakeErrReply("NOAUTH Authentication required")
 	}
+	cmdFunc, ok := commands[cmdName]
+	if !ok {
+		return protocol.MakeErrReply("ERR unknown command '" + cmdName + "', or not supported in cluster mode.")
+	}
+	return cmdFunc(cluster, c, cmdLine)
 }
 
 func isAuthenticated(c myredis.Connection) bool {

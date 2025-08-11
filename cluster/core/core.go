@@ -12,6 +12,8 @@ type Cluster struct {
 	db          database.DBEngine
 	connections ConnectionFactory
 	config      *Config
+
+	slotsManager *slotsManage
 }
 
 type Config struct {
