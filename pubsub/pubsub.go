@@ -79,11 +79,11 @@ func unsubscribe0(hub *Hub, channel string, client myredis.Connection) bool {
 		return false
 	}
 	subscribes, _ := raw.(*list.LinkedList)
-	removed := subscribes.RemoveAllByVal(func(a interface{}) bool { return utils.Equals(a, client) })
+	subscribes.RemoveAllByVal(func(a interface{}) bool { return utils.Equals(a, client) })
 	if subscribes.Len() == 0 {
 		hub.subs.Remove(channel)
 	}
-	return removed > 0
+	return true
 }
 
 /*	让客户端订阅一个或多个频道
@@ -115,7 +115,7 @@ func Subscribe(hub *Hub, c myredis.Connection, args [][]byte) myredis.Reply {
  *   - hub: Pub/Sub 中心
  *   - c: 客户端连接
 */
-func UnsubscribeAll(hub *Hub, c myredis.Connection) {
+func UnSubscribeAll(hub *Hub, c myredis.Connection) {
 	channels := c.GetChannels()
 
 	hub.subsLocker.Locks(channels...)
@@ -132,12 +132,12 @@ func UnsubscribeAll(hub *Hub, c myredis.Connection) {
  *   - c: 客户端连接
  * 	 - args: 频道名称列表
 */
-func Unsubscribe(hub *Hub, c myredis.Connection, args [][]byte) myredis.Reply {
+func UnSubscribe(hub *Hub, c myredis.Connection, args [][]byte) myredis.Reply {
 	var channels []string
 
 	if len(args) > 0 {
 		channels = make([]string, len(args))
-		for i, arg := range channels {
+		for i, arg := range args {
 			channels[i] = string(arg)
 		}
 	} else {
