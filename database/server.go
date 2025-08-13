@@ -7,6 +7,7 @@ import (
 	"myredis/interface/myredis"
 	"myredis/lib/logger"
 	"myredis/protocol"
+	"myredis/pubsub"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -17,8 +18,10 @@ import (
 var mydisVersion string = "1.0.0"
 
 type Server struct {
-	dbSet     []*atomic.Value
-	persister *aof.Persister
+	dbSet     []*atomic.Value // 数据库实例
+	persister *aof.Persister  // aof 持久化
+	// 处理订阅事务
+	hub *pubsub.Hub
 
 	insertCallback database.KeyEventCallback
 	deleteCallback database.KeyEventCallback
@@ -104,11 +107,15 @@ func (server *Server) Exec(c myredis.Connection, cmdLine [][]byte) (result myred
 }
 
 func (server *Server) AfterClientClose(c myredis.Connection) {
-
+	// 从服务端的订阅中心移除该连接的所有订阅
+	pubsub.UnSubscribeAll(server.hub, c)
 }
 
 func (server *Server) Close() {
-
+	if server.persister != nil {
+		server.persister.Close()
+	}
+	server.stopMaster()
 }
 
 func (server *Server) ExecMulti(conn myredis.Connection, watching map[string]uint32, cmdLines []CmdLine) myredis.Reply {

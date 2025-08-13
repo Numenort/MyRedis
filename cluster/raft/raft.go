@@ -44,6 +44,10 @@ type watcher struct {
 	onFailover    func(newMaster string) // 主节点变更时的回调函数
 }
 
+var Leader = raft.Leader
+var Follower = raft.Follower
+var Candidate = raft.Candidate
+
 // 启动一个新的 Raft 节点，初始化网络、存储、FSM，并创建 raft.Raft 实例
 func StartNode(cfg *RaftConfig) (*Node, error) {
 	// 没有设置广播地址，默认使用监听地址

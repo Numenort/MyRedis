@@ -129,3 +129,9 @@ func (fsm *FSM) getMaster(id string) string {
 	})
 	return master
 }
+
+func (fsm *FSM) GetMigratingTask(taskID string) *MigratingTask {
+	fsm.mu.Lock()
+	defer fsm.mu.Unlock()
+	return fsm.Migratings[taskID]
+}
