@@ -172,7 +172,9 @@ func (factory *defaultClientFactory) NewStream(peerAddr string, cmdLine CmdLine)
 	if err != nil {
 		return nil, err
 	}
+	// 解析连接发送过来的协议
 	channel := parser.ParseStream(conn)
+	// 利用连接发送命令行请求，返回结果
 	send2Node := func(cmdLine CmdLine) myredis.Reply {
 		req := protocol.MakeMultiBulkReply(cmdLine)
 		_, err := conn.Write(req.ToBytes())
@@ -187,7 +189,7 @@ func (factory *defaultClientFactory) NewStream(peerAddr string, cmdLine CmdLine)
 	}
 	// 如果当前集群配置了密码认证，需要先认证
 	if config.Properties.RequirePass != "" {
-		// 发送授权命令
+		// 发送授权命令，判断返回结果是否正确
 		authResp := send2Node(utils.ToCmdLine("AUTH", config.Properties.RequirePass))
 		if !protocol.IsOKReply(authResp) {
 			return nil, fmt.Errorf("auth failde, resp: %s", string(authResp.ToBytes()))
