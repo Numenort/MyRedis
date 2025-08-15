@@ -171,3 +171,7 @@ func (cluster *Cluster) registerOnFailover() {
 		}
 	})
 }
+
+func init() {
+	RegisterCmd(heartbeatCommand, execHeartbeat)
+}

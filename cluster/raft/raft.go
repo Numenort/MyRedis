@@ -198,7 +198,7 @@ func (node *Node) BootstrapCluster(slotCount int) error {
 func (node *Node) Close() error {
 	// 关闭节点（异步操作）
 	future := node.inner.Shutdown()
-	return fmt.Errorf("raft shutdown %v", future.Error())
+	return future.Error()
 }
 
 // 提交命令到 raft 日志，需要输入参数 event: 要执行的操作（如迁移、故障转移等）

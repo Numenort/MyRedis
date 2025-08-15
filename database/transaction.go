@@ -124,6 +124,20 @@ func (db *DB) GetUndoLogs(cmdLine [][]byte) []CmdLine {
 	return undo(db, cmdLine[1:])
 }
 
+// 获取对应命令涉及的读键以及写键
+func GetRelatedKeys(CmdLine [][]byte) ([]string, []string) {
+	cmdName := strings.ToLower(string(CmdLine[0]))
+	cmd, ok := cmdTable[cmdName]
+	if !ok {
+		return nil, nil
+	}
+	prepare := cmd.prepare
+	if prepare == nil {
+		return nil, nil
+	}
+	return prepare(CmdLine[1:])
+}
+
 // ******************** Watch ********************
 func Watch(db *DB, conn myredis.Connection, args [][]byte) myredis.Reply {
 	watching := conn.GetWatching()

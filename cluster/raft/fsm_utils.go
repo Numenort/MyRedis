@@ -85,6 +85,13 @@ func (fsm *FSM) addNode(id, masterID string) error {
 	return nil
 }
 
+// 根据 slotID 获取目标节点
+func (fsm *FSM) PickNode(slot uint32) string {
+	fsm.mu.Lock()
+	defer fsm.mu.Unlock()
+	return fsm.Slot2Node[slot]
+}
+
 // failover 将 oldMaster 的主从关系转移到 newMaster
 //
 //	参数：
@@ -130,6 +137,7 @@ func (fsm *FSM) getMaster(id string) string {
 	return master
 }
 
+// 根据任务 ID 获取迁移任务
 func (fsm *FSM) GetMigratingTask(taskID string) *MigratingTask {
 	fsm.mu.Lock()
 	defer fsm.mu.Unlock()
