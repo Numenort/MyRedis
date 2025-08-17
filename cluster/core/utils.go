@@ -11,6 +11,7 @@ const SlotCount int = 1024
 
 const getCommittedIndexCommand = "raft.committedindex"
 
+// 将命令转发到指定peer节点执行
 func (cluster *Cluster) Relay(peerID string, c myredis.Connection, cmdLine [][]byte) myredis.Reply {
 	if peerID == cluster.SelfID() {
 		return cluster.Exec(c, cmdLine)
@@ -29,6 +30,7 @@ func (cluster *Cluster) GetSlot(key string) uint32 {
 	return cluster.getSlotImpl(key)
 }
 
+// 根据 slot 获取目标节点 ID
 func (cluster *Cluster) PickNode(slotID uint32) string {
 	return cluster.pickNodeImpl(slotID)
 }
@@ -55,4 +57,13 @@ func GetPartitionKey(key string) string {
 		return key
 	}
 	return key[beg+1 : end]
+}
+
+// 在当前节点执行命令
+func (cluster *Cluster) LocalExec(conn myredis.Connection, cmdLine [][]byte) myredis.Reply {
+	return cluster.db.Exec(conn, cmdLine)
+}
+
+func (cluster *Cluster) LocalExecWithLock(conn myredis.Connection, cmdLine [][]byte) myredis.Reply {
+	return cluster.db.ExecWithLock(conn, cmdLine)
 }
