@@ -26,6 +26,7 @@ func (cluster *Cluster) Relay(peerID string, c myredis.Connection, cmdLine [][]b
 	return client.Send(cmdLine)
 }
 
+// 获得 key 对应的 SlotID
 func (cluster *Cluster) GetSlot(key string) uint32 {
 	return cluster.getSlotImpl(key)
 }
@@ -66,4 +67,16 @@ func (cluster *Cluster) LocalExec(conn myredis.Connection, cmdLine [][]byte) myr
 
 func (cluster *Cluster) LocalExecWithLock(conn myredis.Connection, cmdLine [][]byte) myredis.Reply {
 	return cluster.db.ExecWithLock(conn, cmdLine)
+}
+
+// 检查对应的 keys 是否存在
+func (cluster *Cluster) LocalExists(keys []string) []string {
+	var exists []string
+	for _, key := range keys {
+		_, ok := cluster.db.GetEntity(0, key)
+		if ok {
+			exists = append(exists, key)
+		}
+	}
+	return exists
 }
