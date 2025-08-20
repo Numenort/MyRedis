@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"myredis/aof"
+	"myredis/config"
 	"myredis/interface/database"
 	"myredis/interface/myredis"
 	"myredis/lib/logger"
@@ -20,40 +21,65 @@ var mydisVersion string = "1.0.0"
 type Server struct {
 	dbSet     []*atomic.Value // 数据库实例
 	persister *aof.Persister  // aof 持久化
-	// 处理订阅事务
-	hub *pubsub.Hub
+	hub       *pubsub.Hub     // 处理订阅事务
 
+	role         int32
+	slaveStatus  *slaveStatus
+	masterStatus *masterStatus
+
+	// 钩子函数
 	insertCallback database.KeyEventCallback
 	deleteCallback database.KeyEventCallback
 }
 
-// func NewStandaloneServer() *Server {
-// 	server := &Server{}
-// 	if config.Properties.Databases == 0 {
-// 		config.Properties.Databases = 16
-// 	}
-// 	// 创建 myredis 所需的临时目录
-// 	err := os.MkdirAll(config.GetTmpDir(), os.ModePerm)
-// 	if err != nil {
-// 		panic(fmt.Sprintf("create temp dir failed: %v", err))
-// 	}
+func NewStandaloneServer() *Server {
+	server := &Server{}
+	if config.Properties.Databases == 0 {
+		config.Properties.Databases = 16
+	}
+	// 创建所需临时目录
+	err := os.MkdirAll(config.GetTmpDir(), os.ModePerm)
+	if err != nil {
+		panic(fmt.Sprintf("create temp dir failed: %v", err))
+	}
+	// 创建数据库实例
+	server.dbSet = make([]*atomic.Value, config.Properties.Databases)
+	for i := range server.dbSet {
+		singleDB := makeDB()
+		singleDB.index = i
+		holder := &atomic.Value{}
+		holder.Store(singleDB)
+		server.dbSet[i] = holder
+	}
+	// 创建订阅管理中心
+	server.hub = pubsub.MakeHub()
 
-// 	server.dbSet = make([]*atomic.Value, config.Properties.Databases)
-// 	for i := range server.dbSet {
-// 		singleDB := makeDB()
-// 		singleDB.index = i
-// 		holder := &atomic.Value{}
-// 		holder.Store(singleDB)
-// 		server.dbSet[i] = holder
-// 	}
-
-// 	// 如果开启了 AOF 持久化
-// 	vaildAof := false
-// 	if config.Properties.AppendOnly {
-// 		vaildAof = fileExists(config.Properties.AppendFilename)
-
-// 	}
-// }
+	// AOF 持久化
+	vaildAof := false
+	if config.Properties.AppendOnly {
+		vaildAof = fileExists(config.Properties.AppendFilename)
+		// 创建 AOF 管理器
+		aofHandler, err := NewPersister(
+			server,
+			config.Properties.AppendFilename,
+			true,
+			config.Properties.AppendFsync,
+		)
+		if err != nil {
+			panic(err)
+		}
+		server.bindPersister(aofHandler)
+	}
+	// 使用 RDB 持久化
+	if config.Properties.RDBFilename != "" && !vaildAof {
+		err := server.loadRdbFile()
+		if err != nil {
+			logger.Error(err)
+		}
+	}
+	// TODO: 主从复制
+	return server
+}
 
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
@@ -79,6 +105,19 @@ func (server *Server) mustSelectDB(index int) *DB {
 	return selectDB
 }
 
+// 利用新数据库的内容替换掉旧数据库
+func (server *Server) loadDB(dbIndex int, newDB *DB) myredis.Reply {
+	if dbIndex > len(server.dbSet) || dbIndex < 0 {
+		return protocol.MakeErrReply("ERR DB index is out of range")
+	}
+	oldDB := server.mustSelectDB(dbIndex)
+	newDB.index = dbIndex
+	newDB.addAof = oldDB.addAof
+	server.dbSet[dbIndex].Store(newDB)
+	return &protocol.OkReply{}
+}
+
+/* ---------- 实现数据库接口 ---------- */
 func (server *Server) Exec(c myredis.Connection, cmdLine [][]byte) (result myredis.Reply) {
 	defer func() {
 		if err := recover(); err != nil {

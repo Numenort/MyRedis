@@ -35,7 +35,7 @@ func (server *Server) loadRdbFile() error {
 	return nil
 }
 
-// 解析 RDB 文件流
+// 使用给定的 RDB 解码器解析 RDB 数据流，并将解析出的键值对逐个写入指定数据库。
 func (server *Server) LoadRDB(dec *core.Decoder) error {
 	// 解码器解析 RDB 文件流时，每解析出一个完整的 RedisObject，
 	// 调用提供的这个回调函数
@@ -97,6 +97,8 @@ func (server *Server) LoadRDB(dec *core.Decoder) error {
 	return err
 }
 
+// 创建新的 AOF持久化器实例，用于将写操作持久化到磁盘文件
+// 支持在启动时加载 AOF 文件恢复数据
 func NewPersister(db database.DBEngine, filename string, load bool, fsync string) (*aof.Persister, error) {
 	return aof.NewPersister(
 		db, filename, load, fsync, func() database.DBEngine {
@@ -133,6 +135,7 @@ func (server *Server) bindPersister(persister *aof.Persister) {
 
 }
 
+// 创建一个基本的数据库实例，用于 AOF 重写
 func MakeAuxiliaryServer() *Server {
 	simpleServer := &Server{}
 	simpleServer.dbSet = make([]*atomic.Value, config.Properties.Databases)

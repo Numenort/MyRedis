@@ -20,6 +20,10 @@ type ServerProperties struct {
 	RequirePass       string `cfg:"requirepass"`
 	RDBFilename       string `cfg:"rdbfilename"`
 
+	MasterAuth        string `cfg:"masterauth"`
+	SlaveAnnouncePort int    `cfg:"slave-announce-port"`
+	SlaveAnnounceIP   string `cfg:"slave-announce-ip"`
+
 	ClusterEnable bool `cfg:"cluster-enable"`
 
 	CfgPath string `cfg:"cf, omitempty"`

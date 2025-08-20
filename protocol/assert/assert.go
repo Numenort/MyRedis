@@ -125,3 +125,19 @@ func AssertMultiBulkReplySize(t *testing.T, actual myredis.Reply, expected int) 
 		return
 	}
 }
+
+func AssertNullBulk(t *testing.T, result myredis.Reply) {
+	if result == nil {
+		t.Errorf("result is nil %s", printStack())
+		return
+	}
+	bytes := result.ToBytes()
+	if len(bytes) == 0 {
+		t.Errorf("result is empty %s", printStack())
+		return
+	}
+	expect := (&protocol.NullBulkReply{}).ToBytes()
+	if !utils.BytesEquals(expect, bytes) {
+		t.Errorf("result is not null-bulk-protocol %s", printStack())
+	}
+}

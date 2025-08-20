@@ -67,6 +67,8 @@ type Persister struct {
 	buffer    []CmdLine
 }
 
+// 创建一个 AOF 持久化处理器。
+// 负责初始化 Persister 实例，根据配置决定是否加载现有的 AOF 文件来恢复数据。
 func NewPersister(db database.DBEngine, filename string, load bool, fsyncStrategy string, tmpDBMaker func() database.DBEngine) (*Persister, error) {
 	persister := &Persister{
 		aofFilename:      filename,
@@ -104,6 +106,7 @@ func NewPersister(db database.DBEngine, filename string, load bool, fsyncStrateg
 	return persister, nil
 }
 
+// 从 Persister 的监听器集合中移除一个监听器
 func (persister *Persister) RemoveListener(listener Listener) {
 	persister.pausingAof.Lock()
 	defer persister.pausingAof.Unlock()
@@ -139,6 +142,8 @@ func (persister *Persister) listenCmdLine() {
 	persister.aofFinshed <- struct{}{}
 }
 
+// 负责将单个 payload 写入 AOF 文件
+// 写入文件后，通知所有监听器。
 func (persister *Persister) WriteAof(payload *payload) {
 	// 设置为空切片
 	persister.buffer = persister.buffer[:0]
