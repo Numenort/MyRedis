@@ -23,6 +23,7 @@ type ServerProperties struct {
 	MasterAuth        string `cfg:"masterauth"`
 	SlaveAnnouncePort int    `cfg:"slave-announce-port"`
 	SlaveAnnounceIP   string `cfg:"slave-announce-ip"`
+	ReplTimeout       int    `cfg:"repl-timeout"`
 
 	ClusterEnable bool `cfg:"cluster-enable"`
 

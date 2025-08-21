@@ -1,3 +1,13 @@
+// 本文件实现了 Godis 服务器作为从节点（slave）时，与主节点（master）进行数据同步和复制的核心逻辑。
+// 主要功能包括：
+// 1. 处理 SLAVEOF 命令，将服务器设置为某个主节点的从节点，或取消复制。
+// 2. 实现与主节点的连接和握手协议（PING, AUTH, REPLCONF）。
+// 3. 实现 PSYNC 命令的逻辑，用于发起全量同步（FULLRESYNC）或部分同步（CONTINUE）。
+// 4. 接收并加载主节点发送的 RDB 文件以完成全量同步。
+// 5. 在全量同步后，持续接收并执行主节点发送的 AOF 命令流，以保持数据一致。
+// 6. 通过定时任务（cron）与主节点保持心跳，并上报复制偏移量。
+// 7. 实现断线重连机制。
+
 package database
 
 import (
@@ -5,12 +15,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"myredis/aof"
 	"myredis/config"
 	"myredis/interface/myredis"
 	"myredis/lib/logger"
 	"myredis/lib/utils"
+	"myredis/myredis/connection"
 	"myredis/myredis/parser"
 	"myredis/protocol"
 	"net"
@@ -44,7 +54,7 @@ type slaveStatus struct {
 	masterConn net.Conn
 	masterChan <-chan *parser.Payload // 从主节点接收数据的通道
 	replID     string                 // 标识主从复制会话
-	replOffset int64                  // 主从复制会话进度
+	replOffset int64                  // 当前已同步的复制偏移量
 
 	lastRecvTime time.Time
 	running      sync.WaitGroup // 等待所有正在运行的复制任务完成
@@ -55,12 +65,33 @@ func initReplSlaveStatus() *slaveStatus {
 }
 
 // 执行SLAVEOF命令，将当前节点设置为指定主节点的从节点
+// SLAVEOF host port: 将当前服务器设置为指定主节点的从节点。
+// SLAVEOF NO ONE: 取消当前的复制状态，使服务器变回主节点。
 func (server *Server) execSlaveOf(c myredis.Connection, args [][]byte) myredis.Reply {
-	// 当前节点为独立节点
+	// SLAVEOF NO ONE，设置为主节点
 	if strings.ToLower(string(args[0])) == "no" && strings.ToLower(string(args[1])) == "one" {
 		server.slaveOfNone()
 		return protocol.MakeOkReply()
 	}
+
+	// parse 主机和端口
+	host := string(args[0])
+	port, err := strconv.Atoi(string(args[1]))
+	if err != nil {
+		return protocol.MakeErrReply("ERR value is not an integer or out of range")
+	}
+
+	// 更新状态
+	server.slaveStatus.mutex.Lock()
+	atomic.StoreInt32(&server.role, slaveRole)
+	server.slaveStatus.masterHost = host
+	server.slaveStatus.masterPort = port
+	// 增加版本号，使旧的复制任务失效
+	atomic.AddInt32(&server.slaveStatus.configVersion, 1)
+	server.slaveStatus.mutex.Unlock()
+
+	go server.setupMaster()
+	return protocol.MakeOkReply()
 }
 
 // 取消服务器的从节点状态，使其变回主节点
@@ -132,7 +163,7 @@ func (server *Server) setupMaster() {
 		}
 	}
 	// 部分同步
-	err := server.receiveAOF(ctx, configVersion)
+	err = server.receiveAOF(ctx, configVersion)
 	if err != nil {
 		logger.Error(err)
 		// 这里不调用 slaveOfNone，可能是网络临时中断
@@ -390,4 +421,98 @@ func (server *Server) loadMasterRDB(configVersion int32) error {
 		server.bindPersister(persister)
 	}
 	return nil
+}
+
+// 持续接收来自主节点的 AOF 命令流，用于增量同步
+func (server *Server) receiveAOF(ctx context.Context, configVersion int32) error {
+	// 创建用于执行命令的连接（需要执行命令）
+	conn := connection.NewConn(server.slaveStatus.masterConn)
+	conn.SetMaster()
+	// 后台协程正在运行
+	server.slaveStatus.running.Add(1)
+	defer server.slaveStatus.running.Done()
+	for {
+		select {
+		case payload, open := <-server.slaveStatus.masterChan:
+			if !open {
+				return errors.New("master channel unexpected close")
+			}
+			if payload.Err != nil {
+				return payload.Err
+			}
+			// 尝试解析为命令
+			cmdLine, ok := payload.Data.(*protocol.MultiBulkReply)
+			if !ok {
+				return errors.New("unexpected payload: " + string(payload.Data.ToBytes()))
+			}
+
+			server.slaveStatus.mutex.Lock()
+			// 检查版本号是否修改
+			if server.slaveStatus.configVersion != configVersion {
+				return configChangedErr
+			}
+
+			server.Exec(conn, cmdLine.Args)
+			size := len(cmdLine.ToBytes())
+			server.slaveStatus.replOffset += int64(size)
+			server.slaveStatus.lastRecvTime = time.Now()
+
+			logger.Info(
+				"receive %d bytes from master, current offset %d, %s",
+				size, server.slaveStatus.replOffset, strconv.Quote(string(cmdLine.ToBytes())),
+			)
+			server.slaveStatus.mutex.Unlock()
+		case <-ctx.Done():
+			_ = conn.Close()
+			return nil
+		}
+	}
+}
+
+// 定期检查与主节点的连接情况，若超时尝试重连
+func (server *Server) slaveCron() {
+	repl := server.slaveStatus
+	if repl.masterConn == nil {
+		return
+	}
+
+	// 检查与主节点连接是否超时
+	replTimeout := 60 * time.Second
+	if config.Properties.ReplTimeout != 0 {
+		replTimeout = time.Duration(config.Properties.ReplTimeout) * time.Second
+	}
+	minLastRecvTime := time.Now().Add(-replTimeout)
+	if repl.lastRecvTime.Before(minLastRecvTime) {
+		// 超时，尝试重连
+		err := server.reconnectWithMaster()
+		if err != nil {
+			logger.Error("send failed " + err.Error())
+		}
+		return
+	}
+	// 发送 ACK 命令，告知当前的偏移量
+	err := repl.sendAck2Master()
+	if err != nil {
+		logger.Error("send failed " + err.Error())
+	}
+}
+
+// 与主节点进行重连
+func (server *Server) reconnectWithMaster() error {
+	logger.Info("reconnectioning with master")
+	server.slaveStatus.mutex.Lock()
+	defer server.slaveStatus.mutex.Unlock()
+
+	// 停止原有的复制相关活动
+	server.slaveStatus.stopSlaveWithMutex()
+	go server.setupMaster()
+	return nil
+}
+
+// 向主节点发送 ACK 命令，发送节点同步进度
+func (repl *slaveStatus) sendAck2Master() error {
+	psyncCmdLine := utils.ToCmdLine("REPLCONF", "ACK", strconv.FormatInt(repl.replOffset, 10))
+	psyncReq := protocol.MakeMultiBulkReply(psyncCmdLine)
+	_, err := repl.masterConn.Write(psyncReq.ToBytes())
+	return err
 }
