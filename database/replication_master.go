@@ -94,13 +94,13 @@ import (
 	"fmt"
 	"myredis/interface/myredis"
 	"myredis/lib/logger"
+	"myredis/lib/sync/atomic"
 	"myredis/lib/utils"
 	"myredis/protocol"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -196,7 +196,7 @@ type masterStatus struct {
 	bgSaveState  uint8                     // 后台 RDB 保存的状态
 	rdbFilename  string
 	aofListener  *replAofListener // 用于监听 AOF 持久化，并将命令写入积压缓冲区
-	rewriting    atomic.Bool      // 是否正在重写 RDB
+	rewriting    atomic.Boolean   // 是否正在重写 RDB
 }
 
 func (server *Server) initMasterStatus() {
@@ -305,7 +305,7 @@ func (server *Server) saveForReplication() error {
 	return nil
 }
 
-// 对指定的从节点执行全量同步
+// 对指定的从节点执行全量同步的具体实现
 // 主要包含：发送 RDB 文件、发送增量数据
 func (server *Server) masterFullReSyncWithSlave(slave *slaveClient) error {
 	// 1.首先发送响应头
@@ -381,36 +381,6 @@ func (server *Server) masterTryPartialSyncWithSlave(slave *slaveClient, replID s
 		return fmt.Errorf("partial resync write backlog to slave failed: %v", err)
 	}
 	server.setSlaveOnline(slave, currentOffset)
-	return nil
-}
-
-// 将缓冲区中暂存的更新数据发送给从节点
-func (server *Server) masterSendUpdatesToSlave() error {
-	// 获取在线状态节点集合
-	onlineSlaves := make(map[*slaveClient]struct{})
-	server.masterStatus.mu.RLock()
-	beginOffset := server.masterStatus.backlog.beginOffset
-	// 获取更新数据
-	backlog, currentOffset := server.masterStatus.backlog.getSnapshot()
-	for slave := range server.masterStatus.onlineSlaves {
-		onlineSlaves[slave] = struct{}{}
-	}
-	server.masterStatus.mu.RUnlock()
-
-	for slave := range onlineSlaves {
-		// 需要发送的缓冲区数据起点
-		slaveBeginOffset := slave.offset - beginOffset
-		// 遍历每个从节点，发送数据
-		_, err := slave.conn.Write(backlog[slaveBeginOffset:])
-		if err != nil {
-			logger.Errorf("send updates backlog to slave failed: %v", err)
-			// 移除从节点
-			server.removeSlave(slave)
-			continue
-		}
-		// 更新已复制的偏移量
-		slave.offset = currentOffset
-	}
 	return nil
 }
 
@@ -542,18 +512,48 @@ func (server *Server) masterCorn() {
 	}
 
 	// 如果积压的缓冲区过大（即待执行的命令过多）且不处于重写状态
-	if backlogSize > maxBacklogSize && !server.masterStatus.rewriting.Load() {
+	if backlogSize > maxBacklogSize && !server.masterStatus.rewriting.Get() {
 		go func() {
-			server.masterStatus.rewriting.Store(true)
-			defer server.masterStatus.rewriting.Store(false)
+			server.masterStatus.rewriting.Set(true)
+			defer server.masterStatus.rewriting.Set(false)
 			// 重写
 			if err := server.rewriteRDB(); err != nil {
 				// 再次检查，防止 err 导致的未执行
-				server.masterStatus.rewriting.Store(false)
+				server.masterStatus.rewriting.Set(false)
 				logger.Errorf("rewrite error: %v", err)
 			}
 		}()
 	}
+}
+
+// 将缓冲区中暂存的更新数据发送给从节点
+func (server *Server) masterSendUpdatesToSlave() error {
+	// 获取在线状态节点集合
+	onlineSlaves := make(map[*slaveClient]struct{})
+	server.masterStatus.mu.RLock()
+	beginOffset := server.masterStatus.backlog.beginOffset
+	// 获取更新数据
+	backlog, currentOffset := server.masterStatus.backlog.getSnapshot()
+	for slave := range server.masterStatus.onlineSlaves {
+		onlineSlaves[slave] = struct{}{}
+	}
+	server.masterStatus.mu.RUnlock()
+
+	for slave := range onlineSlaves {
+		// 需要发送的缓冲区数据起点
+		slaveBeginOffset := slave.offset - beginOffset
+		// 遍历每个从节点，发送数据
+		_, err := slave.conn.Write(backlog[slaveBeginOffset:])
+		if err != nil {
+			logger.Errorf("send updates backlog to slave failed: %v", err)
+			// 移除从节点
+			server.removeSlave(slave)
+			continue
+		}
+		// 更新已复制的偏移量
+		slave.offset = currentOffset
+	}
+	return nil
 }
 
 // 在积压缓冲区过大时，通过生成新的 RDB 和积压缓冲区来减小其大小

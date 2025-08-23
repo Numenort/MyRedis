@@ -4,7 +4,7 @@ import "sync/atomic"
 
 // 线程安全的布尔变量
 
-// Go 中的方法本质上是绑定到类型的普通函数\
+// Go 中的方法本质上是绑定到类型的普通函数
 // 接收者（如 b *Boolean）只是函数的第一个隐式参数。
 
 type Boolean uint32
