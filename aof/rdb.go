@@ -76,6 +76,10 @@ func (persister *Persister) GenerateRDBForReplication(rdbFileName string, listen
 	if err != nil {
 		return err
 	}
+	err = os.Rename(RewriteCtx.tempFile.Name(), rdbFileName)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
