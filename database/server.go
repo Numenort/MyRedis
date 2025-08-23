@@ -23,25 +23,26 @@ type Server struct {
 	persister *aof.Persister  // aof 持久化
 	hub       *pubsub.Hub     // 处理订阅事务
 
-	role         int32
-	slaveStatus  *slaveStatus
-	masterStatus *masterStatus
+	role         int32         // 标识当前服务器的角色
+	slaveStatus  *slaveStatus  // 作为从节点时的状态
+	masterStatus *masterStatus // 作为主节点时的状态
 
-	// 钩子函数
-	insertCallback database.KeyEventCallback
-	deleteCallback database.KeyEventCallback
+	insertCallback database.KeyEventCallback // 键被添加时的回调函数
+	deleteCallback database.KeyEventCallback // 键被删除时的回调函数
 }
 
+// 创建一个独立的 mydis 服务器实例
 func NewStandaloneServer() *Server {
 	server := &Server{}
 	if config.Properties.Databases == 0 {
 		config.Properties.Databases = 16
 	}
-	// 创建所需临时目录
+	// 创建所需临时目录 (RDB)
 	err := os.MkdirAll(config.GetTmpDir(), os.ModePerm)
 	if err != nil {
-		panic(fmt.Sprintf("create temp dir failed: %v", err))
+		panic(fmt.Errorf("create temp dir failed: %v", err))
 	}
+
 	// 创建数据库实例
 	server.dbSet = make([]*atomic.Value, config.Properties.Databases)
 	for i := range server.dbSet {
@@ -51,10 +52,11 @@ func NewStandaloneServer() *Server {
 		holder.Store(singleDB)
 		server.dbSet[i] = holder
 	}
+
 	// 创建订阅管理中心
 	server.hub = pubsub.MakeHub()
 
-	// AOF 持久化
+	// 初始化 AOF 持久化
 	vaildAof := false
 	if config.Properties.AppendOnly {
 		vaildAof = fileExists(config.Properties.AppendFilename)
@@ -70,20 +72,33 @@ func NewStandaloneServer() *Server {
 		}
 		server.bindPersister(aofHandler)
 	}
-	// 使用 RDB 持久化
+
+	// 如果配置了 RDB 文件且没有有效的 AOF 文件，则尝试加载 RDB 文件
 	if config.Properties.RDBFilename != "" && !vaildAof {
 		err := server.loadRdbFile()
 		if err != nil {
 			logger.Error(err)
 		}
 	}
-	// TODO: 主从复制
+
+	// 初始化主从复制状态
+	server.slaveStatus = initReplSlaveStatus()
+	server.initMasterStatus()
+	// 启动主从复制定时任务
+	server.startReplCron()
+	server.role = masterRole
 	return server
 }
 
-func fileExists(filename string) bool {
-	info, err := os.Stat(filename)
-	return err != nil && !info.IsDir()
+// 启动定时任务，周期性地执行主从复制相关维护任务
+func (server *Server) startReplCron() {
+	go func(mdb *Server) {
+		ticker := time.Tick(10 * time.Second)
+		for range ticker {
+			mdb.slaveCron()
+			mdb.masterCorn()
+		}
+	}(server)
 }
 
 // selectDB 根据数据库索引安全地获取对应的数据库实例。
@@ -119,6 +134,7 @@ func (server *Server) loadDB(dbIndex int, newDB *DB) myredis.Reply {
 
 /* ---------- 实现数据库接口 ---------- */
 
+// 解析命令并将其路由到正确的处理程序
 func (server *Server) Exec(c myredis.Connection, cmdLine [][]byte) (result myredis.Reply) {
 	defer func() {
 		if err := recover(); err != nil {
@@ -128,6 +144,7 @@ func (server *Server) Exec(c myredis.Connection, cmdLine [][]byte) (result myred
 	}()
 
 	cmdName := strings.ToLower(string(cmdLine[0]))
+	// 无需认证的命令
 	if cmdName == "ping" {
 		return Ping(c, cmdLine[1:])
 	}
@@ -142,6 +159,9 @@ func (server *Server) Exec(c myredis.Connection, cmdLine [][]byte) (result myred
 	}
 	if cmdName == "dbsize" {
 		return Dbsize(c, server)
+	}
+	if cmdName == "command" {
+		return execCommand(cmdLine[1:])
 	}
 	return nil
 }
@@ -246,4 +266,9 @@ func (server *Server) GetAvgTTL(dbIndex, randomKeyCount int) int64 {
 		}
 	}
 	return ttlCount / int64(len(keys))
+}
+
+func fileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	return err != nil && !info.IsDir()
 }
