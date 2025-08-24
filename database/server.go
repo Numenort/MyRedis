@@ -7,10 +7,12 @@ import (
 	"myredis/interface/database"
 	"myredis/interface/myredis"
 	"myredis/lib/logger"
+	"myredis/lib/utils"
 	"myredis/protocol"
 	"myredis/pubsub"
 	"os"
 	"runtime/debug"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -101,6 +103,8 @@ func (server *Server) startReplCron() {
 	}(server)
 }
 
+/*---------- 数据库相关操作 ----------*/
+
 // selectDB 根据数据库索引安全地获取对应的数据库实例。
 // 如果索引超出范围，返回 nil 和一个错误回复。
 func (server *Server) selectDB(index int) (*DB, *protocol.StandardErrReply) {
@@ -130,6 +134,36 @@ func (server *Server) loadDB(dbIndex int, newDB *DB) myredis.Reply {
 	newDB.addAof = oldDB.addAof
 	server.dbSet[dbIndex].Store(newDB)
 	return &protocol.OkReply{}
+}
+
+// 执行 FLUSHDB 命令，先将命令写入 AOF 文件，再清空数据库
+func (server *Server) execFlushDB(dbIndex int) myredis.Reply {
+	if server.persister != nil {
+		server.persister.SaveCmdLine(dbIndex, utils.ToCmdLine("FlushDB"))
+	}
+	return server.flushDB(dbIndex)
+}
+
+// 清空指定索引的数据库
+func (server *Server) flushDB(dbIndex int) myredis.Reply {
+	if dbIndex >= len(server.dbSet) || dbIndex < 0 {
+		return protocol.MakeErrReply("ERR DB index is out of range")
+	}
+	newDB := makeDB()
+	server.loadDB(dbIndex, newDB)
+	return protocol.MakeOkReply()
+}
+
+// 清空所有数据库
+func (server *Server) flushAll() myredis.Reply {
+	for i := range server.dbSet {
+		server.flushDB(i)
+	}
+	// 记录到 AOF 文件中
+	if server.persister != nil {
+		server.persister.SaveCmdLine(0, utils.ToCmdLine("FlushAll"))
+	}
+	return protocol.MakeOkReply()
 }
 
 /* ---------- 实现数据库接口 ---------- */
@@ -163,7 +197,76 @@ func (server *Server) Exec(c myredis.Connection, cmdLine [][]byte) (result myred
 	if cmdName == "command" {
 		return execCommand(cmdLine[1:])
 	}
-	return nil
+	if cmdName == "slaveof" {
+		if c != nil && c.InMultiState() {
+			return protocol.MakeErrReply("cannot use slave of database within multi")
+		}
+		if len(cmdLine) != 3 {
+			return protocol.MakeArgNumErrReply("SLAVEOF")
+		}
+		return server.execSlaveOf(c, cmdLine[1:])
+	}
+	// 从节点只允许执行读命令
+	role := atomic.LoadInt32(&server.role)
+	if role == slaveRole && !c.IsMaster() {
+		if !isReadOnlyCommand(cmdName) {
+			return protocol.MakeErrReply("READONLY You can't write against a read only slave.")
+		}
+	}
+
+	if cmdName == "subscribe" {
+		if len(cmdLine) < 2 {
+			return protocol.MakeArgNumErrReply("subscribe")
+		}
+		return pubsub.Subscribe(server.hub, c, cmdLine[1:])
+	} else if cmdName == "publish" {
+		return pubsub.Publish(server.hub, cmdLine[1:])
+	} else if cmdName == "unsubscribe" {
+		return pubsub.UnSubscribe(server.hub, c, cmdLine[1:])
+	} else if cmdName == "bgrewriteaof" {
+		return BGRewriteAOF(server, cmdLine[1:])
+	} else if cmdName == "rewriteaof" {
+		return RewriteAOF(server, cmdLine[1:])
+	} else if cmdName == "flushall" {
+		return server.flushAll()
+	} else if cmdName == "flushdb" {
+		if !validateArity(1, cmdLine) {
+			return protocol.MakeArgNumErrReply(cmdName)
+		}
+		if c.InMultiState() {
+			return protocol.MakeErrReply("ERR command 'FlushDB' cannot be used int Multi")
+		}
+		return server.execFlushDB(c.GetDBIndex())
+	} else if cmdName == "save" {
+		return SaveRDB(server, cmdLine[1:])
+	} else if cmdName == "bgsave" {
+		return BGSaveRDB(server, cmdLine[1:])
+	} else if cmdName == "select" {
+		if c != nil && c.InMultiState() {
+			return protocol.MakeErrReply("cannot select database within multi")
+		}
+		if len(cmdLine) != 2 {
+			return protocol.MakeArgNumErrReply("select")
+		}
+		return execSelect(c, server, cmdLine[1:])
+	} else if cmdName == "copy" {
+		if len(cmdLine) < 3 {
+			return protocol.MakeArgNumErrReply("copy")
+		}
+		return execCopy(server, c, cmdLine[1:])
+	} else if cmdName == "replconf" {
+		return server.execReplConf(c, cmdLine[1:])
+	} else if cmdName == "psync" {
+		return server.execPSync(c, cmdLine[1:])
+	}
+
+	// 对于普通命令，分发到客户端当前选择的数据库进行处理
+	dbIndex := c.GetDBIndex()
+	selectedDB, errReply := server.selectDB(dbIndex)
+	if errReply != nil {
+		return errReply
+	}
+	return selectedDB.Exec(c, cmdLine)
 }
 
 func (server *Server) AfterClientClose(c myredis.Connection) {
@@ -172,9 +275,13 @@ func (server *Server) AfterClientClose(c myredis.Connection) {
 }
 
 func (server *Server) Close() {
+	// 停止从节点功能
+	server.slaveStatus.close()
+	// 停止持久化功能
 	if server.persister != nil {
 		server.persister.Close()
 	}
+	// 停止主节点功能
 	server.stopMaster()
 }
 
@@ -233,6 +340,7 @@ func (server *Server) GetUndoLogs(dbIndex int, cmdLine [][]byte) []CmdLine {
 	return server.mustSelectDB(dbIndex).GetUndoLogs(cmdLine)
 }
 
+// 键被删除时的回调函数
 func (server *Server) SetKeyDeletedCallback(callback database.KeyEventCallback) {
 	server.deleteCallback = callback
 	for i := range server.dbSet {
@@ -241,6 +349,7 @@ func (server *Server) SetKeyDeletedCallback(callback database.KeyEventCallback) 
 	}
 }
 
+// 新键被插入时的回调函数
 func (server *Server) SetKeyInsertedCallback(callback database.KeyEventCallback) {
 	server.deleteCallback = callback
 	for i := range server.dbSet {
@@ -249,6 +358,21 @@ func (server *Server) SetKeyInsertedCallback(callback database.KeyEventCallback)
 	}
 }
 
+/*---------- 一些其他函数 ----------*/
+
+func execSelect(c myredis.Connection, mdb *Server, args [][]byte) myredis.Reply {
+	dbIndex, err := strconv.Atoi(string(args[0]))
+	if err != nil {
+		return protocol.MakeErrReply("ERR invaild DB index")
+	}
+	if dbIndex >= len(mdb.dbSet) || dbIndex < 0 {
+		return protocol.MakeErrReply("ERR DB index is out of range")
+	}
+	c.SelectDB(dbIndex)
+	return protocol.MakeOkReply()
+}
+
+// 估算并返回数据库中键的平均 TTL
 func (server *Server) GetAvgTTL(dbIndex, randomKeyCount int) int64 {
 	var ttlCount int64
 	db := server.mustSelectDB(dbIndex)
@@ -271,4 +395,61 @@ func (server *Server) GetAvgTTL(dbIndex, randomKeyCount int) int64 {
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
 	return err != nil && !info.IsDir()
+}
+
+/* ---------- 持久化 ----------*/
+
+// 同步执行 AOF 文件重写任务
+func RewriteAOF(db *Server, args [][]byte) myredis.Reply {
+	err := db.persister.Rewrite()
+	if err != nil {
+		return protocol.MakeErrReply(err.Error())
+	}
+	return protocol.MakeOkReply()
+}
+
+// 后台异步执行 AOF 文件重写任务
+func BGRewriteAOF(db *Server, args [][]byte) myredis.Reply {
+	go db.persister.Rewrite()
+	return protocol.MakeStatusReply("Background append only file rewriting started")
+}
+
+// 同步地生成 RDB 快照文件
+func SaveRDB(db *Server, args [][]byte) myredis.Reply {
+	if db.persister == nil {
+		return protocol.MakeErrReply("please enable aof before using save")
+	}
+	rdbFilename := config.Properties.RDBFilename
+	if rdbFilename == "" {
+		rdbFilename = "dump.rdb"
+	}
+	// 生成 RDB 文件
+	err := db.persister.GenerateRDB(rdbFilename)
+	if err != nil {
+		return protocol.MakeErrReply(err.Error())
+	}
+	return protocol.MakeOkReply()
+}
+
+// 后台异步地生成 RDB 快照文件
+func BGSaveRDB(db *Server, args [][]byte) myredis.Reply {
+	if db.persister == nil {
+		return protocol.MakeErrReply("please enable aof before using save")
+	}
+	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				logger.Error(err)
+			}
+		}()
+		rdbFilename := config.Properties.RDBFilename
+		if rdbFilename == "" {
+			rdbFilename = "dump.rdb"
+		}
+		err := db.persister.GenerateRDB(rdbFilename)
+		if err != nil {
+			logger.Error(err)
+		}
+	}()
+	return protocol.MakeStatusReply("Background saving started")
 }

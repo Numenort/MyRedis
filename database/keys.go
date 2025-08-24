@@ -462,6 +462,66 @@ func execScan(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeMultiRawReply(result)
 }
 
+// 将源键的值复制到目标键，支持跨数据库复制
+// 命令格式：COPY source destination [DB destination-db] [REPLACE]
+func execCopy(mdb *Server, conn myredis.Connection, args [][]byte) myredis.Reply {
+	dbIndex := conn.GetDBIndex()
+	db := mdb.mustSelectDB(dbIndex)
+	replaceFlag := false
+	srcKey := string(args[0])
+	destKey := string(args[1])
+
+	// 解析额外的命令选项
+	if len(args) > 2 {
+		for i := 2; i < len(args); i++ {
+			arg := strings.ToLower(string(args[i]))
+			if arg == "db" {
+				if i+1 >= len(args) {
+					return &protocol.SyntaxErrReply{}
+				}
+				idx, err := strconv.Atoi(string(args[i+1]))
+				if err != nil {
+					return protocol.MakeErrReply("ERR DB index is out of index")
+				}
+				if idx > len(mdb.dbSet) || idx < 0 {
+					return protocol.MakeErrReply("ERR DB index is out of range")
+				}
+				dbIndex = idx
+				i++
+			} else if arg == "replace" {
+				replaceFlag = true
+			} else {
+				return protocol.MakeSyntaxErrReply()
+			}
+		}
+	}
+
+	if srcKey == destKey && dbIndex == conn.GetDBIndex() {
+		return protocol.MakeErrReply("ERR source and destination objects are the same")
+	}
+
+	src, exists := db.GetEntity(srcKey)
+	if !exists {
+		return protocol.MakeIntReply(0)
+	}
+	destDB := mdb.mustSelectDB(dbIndex)
+	if _, exists := destDB.GetEntity(destKey); exists {
+		// 目标数据库存在且不替换
+		if replaceFlag == false {
+			return protocol.MakeIntReply(0)
+		}
+	}
+	destDB.PutEntity(destKey, src)
+	// 过期时间相关
+	raw, exists := db.ttlMap.Get(srcKey)
+	if exists {
+		expire := raw.(time.Time)
+		destDB.Expire(destKey, expire)
+	}
+	mdb.AddAof(conn.GetDBIndex(), utils.ToCmdLine3("copy", args...))
+	return protocol.MakeIntReply(1)
+}
+
 func init() {
 	registerCommand("Del", execDel, writeAllKeys, undoDel, -2, flagWrite).
 		attachCommandExtra([]string{redisFlagWrite}, 1, -1, 1)

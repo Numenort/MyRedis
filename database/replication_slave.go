@@ -127,6 +127,13 @@ func (repl *slaveStatus) stopSlaveWithMutex() {
 	repl.masterChan = nil
 }
 
+func (repl *slaveStatus) close() error {
+	repl.mutex.Lock()
+	defer repl.mutex.Unlock()
+	repl.stopSlaveWithMutex()
+	return nil
+}
+
 // 与主节点建立连接，进行全量同步，接收AOF增量数据
 func (server *Server) setupMaster() {
 	defer func() {

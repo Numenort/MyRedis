@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"myredis/lib/utils"
+	"time"
+)
 
 const (
 	ClusterMode    = "cluster"    // 集群
@@ -9,6 +12,7 @@ const (
 
 type ServerProperties struct {
 	RunID string `cfg:"runid"`
+	Bind  string `cfg:"bind"`
 	Port  int    `cfg:"port"`
 
 	Dir               string `cfg:"dir"`
@@ -36,6 +40,15 @@ type ServerInfo struct {
 
 var Properties *ServerProperties
 var EachTimeServerInfo *ServerInfo
+
+func init() {
+	Properties = &ServerProperties{
+		Bind:       "127.0.0.1",
+		Port:       2025,
+		AppendOnly: false,
+		RunID:      utils.RandString(10),
+	}
+}
 
 func GetTmpDir() string {
 	return Properties.Dir + "/tmp"
