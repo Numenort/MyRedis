@@ -1,6 +1,11 @@
 package raft
 
-import "github.com/hashicorp/raft"
+import (
+	"fmt"
+	"strconv"
+
+	"github.com/hashicorp/raft"
+)
 
 // 返回 raft 节点自身 ID
 func (node *Node) Self() string {
@@ -20,4 +25,19 @@ func (node *Node) GetSlaves(id string) *MasterSlave {
 func (node *Node) GetLeaderRedisAddress() string {
 	_, id := node.inner.LeaderWithID()
 	return string(id)
+}
+
+func (node *Node) GetNodes() ([]raft.Server, error) {
+	configFuture := node.inner.GetConfiguration()
+	if err := configFuture.Error(); err != nil {
+		return nil, fmt.Errorf("failed to get raft configuration: %v", err)
+	}
+	return configFuture.Configuration().Servers, nil
+}
+
+// 获取当前 Raft 集群中已被提交的日志索引
+func (node *Node) CommittedIndex() (uint64, error) {
+	status := node.inner.Stats()
+	committedIndex := status["commit_index"]
+	return strconv.ParseUint(committedIndex, 10, 64)
 }

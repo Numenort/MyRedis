@@ -61,6 +61,7 @@ type slotStatus struct {
 	dirtyKeys      *set.Set // 导出过程中被插入或删除的 key 集合
 }
 
+// 根据 SlotID 获取对应的槽位
 func (ssm *slotsManage) getSlot(index uint32) *slotStatus {
 	ssm.mu.RLock()
 	slot := ssm.slots[index]

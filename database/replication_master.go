@@ -319,7 +319,7 @@ func (server *Server) masterFullReSyncWithSlave(slave *slaveClient) error {
 	// 2.发送 RDB 文件
 	rdbFile, err := os.Open(server.masterStatus.rdbFilename)
 	if err != nil {
-		return fmt.Errorf("open rdb file %s for replication error: %v", rdbFile, err)
+		return fmt.Errorf("open rdb file %s for replication error: %v", rdbFile.Name(), err)
 	}
 	defer rdbFile.Close()
 

@@ -184,12 +184,12 @@ func execFinishExport(cluster *Cluster, c myredis.Connection, cmdLine CmdLine) m
 	if task == nil {
 		return protocol.MakeErrReply("ERR get migrating task timeout")
 	}
-	logger.Info("finish migration task %s, got task info", taskID)
+	logger.Info(fmt.Sprintf("finish migration task %s, got task info", taskID))
 
 	// 按顺序释放加入的锁
 	var lockedSlots []uint32
 	defer func() {
-		for i := 0; i < len(lockedSlots); i++ {
+		for i := len(lockedSlots) - 1; i >= 0; i-- {
 			slotID := lockedSlots[i]
 			slotManager := cluster.slotsManager.getSlot(slotID)
 			slotManager.mu.Unlock()
@@ -205,7 +205,7 @@ func execFinishExport(cluster *Cluster, c myredis.Connection, cmdLine CmdLine) m
 		cluster.dumpDataThroughConnection(c, slotManager.dirtyKeys)
 		slotManager.finishExportingWithinLock()
 	}
-	logger.Info("finish migration task %s, dirty keys sended", taskID)
+	logger.Infof("finish migration task %s, dirty keys sended", taskID)
 
 	// 获取与主节点的连接
 	leaderConn, err := cluster.BorrowLeaderClient()
@@ -224,7 +224,7 @@ func execFinishExport(cluster *Cluster, c myredis.Connection, cmdLine CmdLine) m
 		logger.Infof("finish migration request unknown response %s", string(reply.ToBytes()))
 	}
 
-	logger.Info("finish migration task %s, route changed", taskID)
+	logger.Infof("finish migration task %s, route changed", taskID)
 	c.Write(protocol.MakeOkReply().ToBytes())
 	return &protocol.NoReply{}
 }
@@ -245,7 +245,7 @@ func execStartMigration(cluster *Cluster, c myredis.Connection, cmdLine CmdLine)
 		slotStr := string(slot)
 		slotID, err := strconv.Atoi(slotStr)
 		if err != nil {
-			return protocol.MakeErrReply("illegal slot id: " + string(slotID))
+			return protocol.MakeErrReply("illegal slot id: " + strconv.Itoa(slotID))
 		}
 		slotIDs = append(slotIDs, uint32(slotID))
 	}
@@ -296,24 +296,24 @@ recvLoop:
 		switch reply := protoc.Data.(type) {
 		case *protocol.MultiBulkReply:
 			// 执行实际的数据相关命令，重建该槽位对应的数据
-			_ = cluster.db.Exec(simpleConn, cmdLine)
+			_ = cluster.db.Exec(simpleConn, reply.Args)
 		case *protocol.StatusReply, *protocol.OkReply:
 			if protocol.IsOKReply(reply) {
 				logger.Info("importing task received OK reply")
 				break recvLoop
 			} else {
 				msg := fmt.Sprintf("migrate error: %s", string(reply.ToBytes()))
-				logger.Errorf(msg)
+				logger.Error(msg)
 				return protocol.MakeErrReply(msg)
 			}
 		case protocol.ErrorReply:
 			msg := fmt.Sprintf("migrate error: %s", reply.Error())
-			logger.Errorf(msg)
+			logger.Error(msg)
 			return protocol.MakeErrReply(msg)
 		}
 	}
 	// 请求源节点发送增量 dirty keys
-	stream2, err := cluster.connections.NewStream(task.SrcNode, utils.ToCmdLine(migrationDoneCommand))
+	stream2, err := cluster.connections.NewStream(task.SrcNode, utils.ToCmdLine(migrationDoneCommand, task.ID))
 	if err != nil {
 		return err
 	}
@@ -334,12 +334,12 @@ recvLoop2:
 				break recvLoop2
 			} else {
 				msg := fmt.Sprintf("migrate error: %s", string(reply.ToBytes()))
-				logger.Errorf(msg)
+				logger.Error(msg)
 				return protocol.MakeErrReply(msg)
 			}
 		case protocol.ErrorReply:
 			msg := fmt.Sprintf("migrate error: %s", reply.Error())
-			logger.Errorf(msg)
+			logger.Error(msg)
 			return protocol.MakeErrReply(msg)
 		}
 	}

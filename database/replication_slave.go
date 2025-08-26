@@ -464,10 +464,10 @@ func (server *Server) receiveAOF(ctx context.Context, configVersion int32) error
 			server.slaveStatus.replOffset += int64(size)
 			server.slaveStatus.lastRecvTime = time.Now()
 
-			logger.Info(
+			logger.Info(fmt.Sprintf(
 				"receive %d bytes from master, current offset %d, %s",
 				size, server.slaveStatus.replOffset, strconv.Quote(string(cmdLine.ToBytes())),
-			)
+			))
 			server.slaveStatus.mutex.Unlock()
 		case <-ctx.Done():
 			_ = conn.Close()

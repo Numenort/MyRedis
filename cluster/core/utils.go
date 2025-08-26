@@ -69,6 +69,15 @@ func (cluster *Cluster) LocalExecWithLock(conn myredis.Connection, cmdLine [][]b
 	return cluster.db.ExecWithLock(conn, cmdLine)
 }
 
+// 获取当前 Raft 集群中已被提交的日志索引
+func execRaftCommittedIndex(cluster *Cluster, c myredis.Connection, cmdLine CmdLine) myredis.Reply {
+	index, err := cluster.raftNode.CommittedIndex()
+	if err != nil {
+		return protocol.MakeErrReply(err.Error())
+	}
+	return protocol.MakeIntReply(int64(index))
+}
+
 // 检查对应的 keys 是否存在
 func (cluster *Cluster) LocalExists(keys []string) []string {
 	var exists []string
@@ -79,4 +88,8 @@ func (cluster *Cluster) LocalExists(keys []string) []string {
 		}
 	}
 	return exists
+}
+
+func init() {
+	RegisterCmd(getCommittedIndexCommand, execRaftCommittedIndex)
 }
