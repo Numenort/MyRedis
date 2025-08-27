@@ -193,3 +193,69 @@ func TestQuickList_Contains(t *testing.T) {
 		t.Error("expect false actual true")
 	}
 }
+
+func TestQuickList_Range(t *testing.T) {
+	list := NewQuickList()
+	size := 10
+	for i := 0; i < size; i++ {
+		list.Add(i)
+	}
+	for start := 0; start < size; start++ {
+		for stop := start; stop < size; stop++ {
+			slice := list.Range(start, stop)
+			if len(slice) != stop-start {
+				t.Error("expected " + strconv.Itoa(stop-start) + ", get: " + strconv.Itoa(len(slice)) +
+					", range: [" + strconv.Itoa(start) + "," + strconv.Itoa(stop) + "]")
+			}
+			sliceIndex := 0
+			for i := start; i < stop; i++ {
+				val := slice[sliceIndex]
+				intVal, _ := val.(int)
+				if intVal != i {
+					t.Error("expected " + strconv.Itoa(i) + ", get: " + strconv.Itoa(intVal) +
+						", range: [" + strconv.Itoa(start) + "," + strconv.Itoa(stop) + "]")
+				}
+				sliceIndex++
+			}
+		}
+	}
+}
+
+func TestQuickList_Remove(t *testing.T) {
+	list := NewQuickList()
+	size := pagesize * 10
+	for i := 0; i < size; i++ {
+		list.Add(i)
+	}
+	for i := size - 1; i >= 0; i-- {
+		list.Remove(i)
+		if i != list.Len() {
+			t.Error("remove test fail: expected size " + strconv.Itoa(i) + ", actual: " + strconv.Itoa(list.Len()))
+		}
+		list.ForEach(func(i int, v interface{}) bool {
+			intVal, _ := v.(int)
+			if intVal != i {
+				t.Error("remove test fail: expected " + strconv.Itoa(i) + ", actual: " + strconv.Itoa(intVal))
+			}
+			return true
+		})
+	}
+}
+
+func TestQuickList_Prev(t *testing.T) {
+	list := NewQuickList()
+	size := pagesize * 10
+	for i := 0; i < size; i++ {
+		list.Add(i)
+	}
+	iter := list.find(size - 1)
+	i := size - 1
+	for !iter.atBegin() {
+		v := iter.get()
+		if v != i {
+			t.Errorf("wrong value at %d", i)
+		}
+		iter.prev()
+		i--
+	}
+}

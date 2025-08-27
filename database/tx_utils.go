@@ -140,7 +140,7 @@ func rollbackZSetFields(db *DB, key string, fields ...string) []CmdLine {
 	}
 	if zset == nil {
 		undoCmdLine = append(undoCmdLine,
-			utils.ToCmdLine("DEL"),
+			utils.ToCmdLine("DEL", key),
 		)
 		return undoCmdLine
 	}
