@@ -11,7 +11,7 @@ import (
 
 var testDB = makeTestDB()
 
-// var testServer = NewStandaloneServer()
+var testServer = NewStandaloneServer()
 
 func TestSetEmpty(t *testing.T) {
 	key := utils.RandString(10)

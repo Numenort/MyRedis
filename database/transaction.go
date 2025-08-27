@@ -171,3 +171,14 @@ func EnqueueCmd(conn myredis.Connection, cmdLine [][]byte) myredis.Reply {
 	conn.EnqueueCmd(cmdLine)
 	return protocol.MakeQueuedReply()
 }
+
+// 获取 key 对应的版本信息
+func execGetVersion(db *DB, args [][]byte) myredis.Reply {
+	key := string(args[0])
+	version := db.GetVersion(key)
+	return protocol.MakeIntReply(int64(version))
+}
+
+func init() {
+	registerCommand("GetVer", execGetVersion, readAllKeys, nil, 2, flagReadOnly)
+}
