@@ -35,6 +35,8 @@ const (
 	redisFlagSortForScript = "sortforscript"
 	// 键的位置不固定，需通过规则动态计算的命令
 	redisFlagMovableKeys = "movablekeys"
+	// 订阅相关命令
+	redisFlagPubSub = "pubsub"
 )
 
 func execCommand(args [][]byte) myredis.Reply {
@@ -101,4 +103,45 @@ func getKeys(args [][]byte) myredis.Reply {
 		resp[i] = []byte(key)
 	}
 	return protocol.MakeMultiBulkReply(resp)
+}
+
+// 在服务器层面（server.go）注册的命令
+func init() {
+	registerSpecialCommand("Command", 0, 0).
+		attachCommandExtra([]string{redisFlagRandom, redisFlagLoading, redisFlagStale}, 0, 0, 0)
+	registerSpecialCommand("Keys", 2, 0).
+		attachCommandExtra([]string{redisFlagReadonly, redisFlagSortForScript}, 0, 0, 0)
+	registerSpecialCommand("Auth", 2, 0).
+		attachCommandExtra([]string{redisFlagNoScript, redisFlagLoading, redisFlagStale, redisFlagSkipMonitor, redisFlagFast}, 0, 0, 0)
+	registerSpecialCommand("Info", -1, 0).
+		attachCommandExtra([]string{redisFlagRandom, redisFlagLoading, redisFlagStale}, 0, 0, 0)
+	registerSpecialCommand("SlaveOf", 3, 0).
+		attachCommandExtra([]string{redisFlagAdmin, redisFlagNoScript, redisFlagStale}, 0, 0, 0)
+	registerSpecialCommand("Subscribe", -2, 0).
+		attachCommandExtra([]string{redisFlagPubSub, redisFlagNoScript, redisFlagLoading, redisFlagStale}, 0, 0, 0)
+	registerSpecialCommand("Publish", 3, 0).
+		attachCommandExtra([]string{redisFlagPubSub, redisFlagNoScript, redisFlagLoading, redisFlagFast}, 0, 0, 0)
+	registerSpecialCommand("FlushAll", -1, 0).
+		attachCommandExtra([]string{redisFlagWrite}, 0, 0, 0)
+	registerSpecialCommand("FlushDB", -1, 0).
+		attachCommandExtra([]string{redisFlagWrite}, 0, 0, 0)
+	registerSpecialCommand("Save", -1, 0).
+		attachCommandExtra([]string{redisFlagAdmin, redisFlagNoScript}, 0, 0, 0)
+	registerSpecialCommand("BgSave", 1, 0).
+		attachCommandExtra([]string{redisFlagAdmin, redisFlagNoScript}, 0, 0, 0)
+	registerSpecialCommand("Select", 2, 0).
+		attachCommandExtra([]string{redisFlagLoading, redisFlagFast}, 0, 0, 0)
+	registerSpecialCommand("ReplConf", -1, 0).
+		attachCommandExtra([]string{redisFlagAdmin, redisFlagNoScript, redisFlagLoading, redisFlagStale}, 0, 0, 0)
+	//attachCommandExtra("ReplConf", 3, []string{redisFlagReadonly, redisFlagAdmin, redisFlagNoScript}, 0, 0, 0, nil)
+
+	// transaction command
+	registerSpecialCommand("Multi", 1, 0).
+		attachCommandExtra([]string{redisFlagNoScript, redisFlagFast}, 0, 0, 0)
+	registerSpecialCommand("Discard", 1, 0).
+		attachCommandExtra([]string{redisFlagNoScript, redisFlagFast}, 0, 0, 0)
+	registerSpecialCommand("Exec", 1, 0).
+		attachCommandExtra([]string{redisFlagNoScript, redisFlagSkipMonitor}, 0, 0, 0)
+	registerSpecialCommand("Watch", 1, 0).
+		attachCommandExtra([]string{redisFlagNoScript, redisFlagFast}, 1, -1, 1)
 }

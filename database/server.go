@@ -394,7 +394,10 @@ func (server *Server) GetAvgTTL(dbIndex, randomKeyCount int) int64 {
 
 func fileExists(filename string) bool {
 	info, err := os.Stat(filename)
-	return err != nil && !info.IsDir()
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
 }
 
 /* ---------- 持久化 ----------*/

@@ -182,8 +182,13 @@ func TestSRandMember(t *testing.T) {
 	}
 	result := testDB.Exec(nil, utils.ToCmdLine("SRandMember", key))
 	br, ok := result.(*protocol.BulkReply)
-	if !ok && len(br.Arg) > 0 {
+	if !ok {
 		t.Errorf("expected bulk protocol, actually %s", result.ToBytes())
+		return
+	}
+
+	if len(br.Arg) == 0 {
+		t.Errorf("expected non-empty bulk reply")
 		return
 	}
 

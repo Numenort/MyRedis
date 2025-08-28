@@ -350,7 +350,7 @@ func (server *Server) masterFullReSyncWithSlave(slave *slaveClient) error {
 	return nil
 }
 
-var cannotPartialSync = errors.New("cannot do partial sync")
+var errCannotPartialSync = errors.New("cannot do partial sync")
 
 // 尝试对从节点进行部分同步
 func (server *Server) masterTryPartialSyncWithSlave(slave *slaveClient, replID string, slaveOffset int64) error {
@@ -358,12 +358,12 @@ func (server *Server) masterTryPartialSyncWithSlave(slave *slaveClient, replID s
 	// replID 不匹配
 	if replID != server.masterStatus.replID {
 		server.masterStatus.mu.RUnlock()
-		return cannotPartialSync
+		return errCannotPartialSync
 	}
 	// 检查请求的偏移量是否有效
 	if !server.masterStatus.backlog.isVaildOffset(slaveOffset) {
 		server.masterStatus.mu.RUnlock()
-		return cannotPartialSync
+		return errCannotPartialSync
 	}
 	// 获取增量数据
 	backlog, currentOffset := server.masterStatus.backlog.getSnapshot()
@@ -427,7 +427,7 @@ func (server *Server) execPSync(c myredis.Connection, args [][]byte) myredis.Rep
 			if err == nil {
 				return
 			}
-			if err != cannotPartialSync {
+			if err != errCannotPartialSync {
 				// 发生其他错误
 				server.removeSlave(slave)
 				logger.Errorf("masterTryPartialSyncWithSlave error: %v", err)

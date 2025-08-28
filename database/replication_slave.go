@@ -39,7 +39,7 @@ const (
 	slaveRole
 )
 
-var configChangedErr = errors.New("slaveStatus config changed")
+var errConfigChanged = errors.New("slaveStatus config changed")
 
 type slaveStatus struct {
 	mutex  sync.Mutex
@@ -277,7 +277,7 @@ func (server *Server) connectionWithMaster(configVersion int32) (bool, error) {
 	defer server.slaveStatus.mutex.Unlock()
 	// 检查配置是否发生变化
 	if server.slaveStatus.configVersion != configVersion {
-		return false, configChangedErr
+		return false, errConfigChanged
 	}
 	server.slaveStatus.masterConn = conn
 	server.slaveStatus.masterChan = masterChan
@@ -403,7 +403,7 @@ func (server *Server) loadMasterRDB(configVersion int32) error {
 	defer server.slaveStatus.mutex.Unlock()
 	// 检查是否有新的复制命令，如果有即中断
 	if server.slaveStatus.configVersion != configVersion {
-		return configChangedErr
+		return errConfigChanged
 	}
 
 	// 将临时数据库的内容替换当前服务器的数据库
@@ -456,7 +456,7 @@ func (server *Server) receiveAOF(ctx context.Context, configVersion int32) error
 			server.slaveStatus.mutex.Lock()
 			// 检查版本号是否修改
 			if server.slaveStatus.configVersion != configVersion {
-				return configChangedErr
+				return errConfigChanged
 			}
 
 			server.Exec(conn, cmdLine.Args)

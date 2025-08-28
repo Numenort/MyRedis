@@ -7,6 +7,7 @@ import (
 )
 
 // ******************** startMulti ********************
+// 启动一次事务：进入事务状态后，客户端发送的命令不会立即执行，而是被放入队列中
 func StartMulti(conn myredis.Connection) myredis.Reply {
 	if conn.InMultiState() {
 		return protocol.MakeErrReply("ERR MULTI calls can not be nested")
@@ -16,6 +17,7 @@ func StartMulti(conn myredis.Connection) myredis.Reply {
 }
 
 // ******************** DiscardMulti ********************
+// 丢弃当前事务：清空事务队列，退出事务状态
 func DiscardMulti(conn myredis.Connection) myredis.Reply {
 	if !conn.InMultiState() {
 		return protocol.MakeErrReply("ERR DISCARD without MULTI")
@@ -26,6 +28,7 @@ func DiscardMulti(conn myredis.Connection) myredis.Reply {
 }
 
 // ******************** execMulti ********************
+// 执行事务：在客户端处于事务状态时，原子化地执行所有排队命令
 func execMulti(db *DB, conn myredis.Connection) myredis.Reply {
 	if !conn.InMultiState() {
 		return protocol.MakeErrReply("ERR EXEC without MULTI")
@@ -38,7 +41,7 @@ func execMulti(db *DB, conn myredis.Connection) myredis.Reply {
 	return db.ExecMulti(conn, conn.GetWatching(), cmdLines)
 }
 
-// 原子性地执行事务
+// 原子性地执行一组事务命令：使用读写锁保护涉及的键，并通过乐观锁检测 WATCH 键是否被修改
 func (db *DB) ExecMulti(conn myredis.Connection, watching map[string]uint32, cmdLines []CmdLine) myredis.Reply {
 	// 准备读写键
 	writeKeys := make([]string, 0)
@@ -59,7 +62,7 @@ func (db *DB) ExecMulti(conn myredis.Connection, watching map[string]uint32, cmd
 	}
 	readKeys = append(readKeys, watchingKeys...)
 	db.RWLocks(writeKeys, readKeys)
-	defer db.RWUnLocks(watchingKeys, readKeys)
+	defer db.RWUnLocks(writeKeys, readKeys)
 
 	// 乐观锁 检查监视的键是否改变
 	if isWatchingChanged(db, watching) {
@@ -100,6 +103,7 @@ func (db *DB) ExecMulti(conn myredis.Connection, watching map[string]uint32, cmd
 	return protocol.MakeErrReply("EXECABORT Transaction discarded because of previous errors.")
 }
 
+// 检查被 WATCH 的键是否有版本变化
 func isWatchingChanged(db *DB, watching map[string]uint32) bool {
 	for key, val := range watching {
 		currentVersion := db.GetVersion(key)
@@ -110,7 +114,7 @@ func isWatchingChanged(db *DB, watching map[string]uint32) bool {
 	return false
 }
 
-// 返回回滚需要执行的命令
+// 获取某条命令对应的回滚命令序列
 func (db *DB) GetUndoLogs(cmdLine [][]byte) []CmdLine {
 	cmdName := strings.ToLower(string(cmdLine[0]))
 	cmd, ok := cmdTable[cmdName]
@@ -124,7 +128,7 @@ func (db *DB) GetUndoLogs(cmdLine [][]byte) []CmdLine {
 	return undo(db, cmdLine[1:])
 }
 
-// 获取对应命令涉及的读键以及写键
+// 获取对应命令涉及的读写键
 func GetRelatedKeys(CmdLine [][]byte) ([]string, []string) {
 	cmdName := strings.ToLower(string(CmdLine[0]))
 	cmd, ok := cmdTable[cmdName]
@@ -139,6 +143,7 @@ func GetRelatedKeys(CmdLine [][]byte) ([]string, []string) {
 }
 
 // ******************** Watch ********************
+// 监视一个或多个键，用于实现事务的条件执行
 func Watch(db *DB, conn myredis.Connection, args [][]byte) myredis.Reply {
 	watching := conn.GetWatching()
 	for _, bkey := range args {
@@ -149,6 +154,7 @@ func Watch(db *DB, conn myredis.Connection, args [][]byte) myredis.Reply {
 }
 
 // ******************** EnqueueCmd ********************
+// 将命令加入事务队列
 func EnqueueCmd(conn myredis.Connection, cmdLine [][]byte) myredis.Reply {
 	cmdName := strings.ToLower(string(cmdLine[0]))
 	cmd, ok := cmdTable[cmdName]

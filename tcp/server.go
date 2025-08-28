@@ -23,12 +23,14 @@ type Config struct {
 
 var ClientCount int32
 
+// 绑定地址并启动 TCP 服务，监听系统信号实现优雅关闭
 func ListenAndServeWithSignal(cfg *Config, handler tcp.Handler) error {
 	closeChan := make(chan struct{})
-	sigCh := make(chan os.Signal)
+	sigCh := make(chan os.Signal, 1)
 	// 监听操作系统信号，实现优雅关闭
 	signal.Notify(sigCh, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
 
+	// 启动 goroutine 监听信号
 	go func() {
 		sig := <-sigCh
 		// 发送关闭信号
@@ -37,16 +39,19 @@ func ListenAndServeWithSignal(cfg *Config, handler tcp.Handler) error {
 			closeChan <- struct{}{}
 		}
 	}()
+	// 开始监听指定地址
 	listener, err := net.Listen("tcp", cfg.Address)
 	if err != nil {
 		return err
 	}
 
 	logger.Info(fmt.Sprintf("bind: %s, start listening...", cfg.Address))
+	// 处理连接
 	ListenAndServe(listener, handler, closeChan)
 	return nil
 }
 
+// 监听 TCP 连接并处理请求：持续接受新连接，并为每个连接启动一个 goroutine 处理
 func ListenAndServe(listener net.Listener, handler tcp.Handler, closeChan <-chan struct{}) {
 	// listen signal
 	errCh := make(chan error, 1)

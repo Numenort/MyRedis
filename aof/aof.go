@@ -186,7 +186,7 @@ func (persister *Persister) WriteAof(payload *payload) {
 func (persister *Persister) LoadAof(maxBytes int) {
 	// 确保在加载 AOF 文件时的 aofChan 不会发送新的数据
 	aofChan := persister.aofChan
-	persister = nil
+	persister.aofChan = nil
 	defer func(aofChan chan *payload) {
 		persister.aofChan = aofChan
 	}(aofChan)

@@ -91,7 +91,7 @@ func (persister *Persister) DoRewrite(ctx *RewriteContext) (err error) {
 	return err
 }
 
-// 将重写期间产生的新命令追加到新文件中，并以原子操作安全地替换掉旧文件
+// 将重写期间产生的新命令（记录在 AOF 文件中）追加到新文件中，并以原子操作安全地替换掉旧文件
 func (persister *Persister) FinishRewrite(ctx *RewriteContext) {
 	// 暂停 AOF 文件的写入
 	persister.pausingAof.Lock()
