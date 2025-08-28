@@ -72,7 +72,7 @@ type Persister struct {
 func NewPersister(db database.DBEngine, filename string, load bool, fsyncStrategy string, tmpDBMaker func() database.DBEngine) (*Persister, error) {
 	persister := &Persister{
 		aofFilename:      filename,
-		aofFsyncStrategy: fsyncStrategy,
+		aofFsyncStrategy: strings.ToLower(fsyncStrategy),
 		db:               db,
 		tmpDBMaker:       tmpDBMaker,
 		currentDB:        0,

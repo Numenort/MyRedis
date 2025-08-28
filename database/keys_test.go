@@ -2,6 +2,7 @@ package database
 
 import (
 	"myredis/lib/utils"
+	"myredis/myredis/connection"
 	"myredis/protocol"
 	"myredis/protocol/assert"
 	"strconv"
@@ -268,50 +269,50 @@ func TestKeys(t *testing.T) {
 	assert.AssertMultiBulkReplySize(t, result, 2)
 }
 
-// func TestCopy(t *testing.T) {
-// 	testDB.Flush()
-// 	testMDB := NewStandaloneServer()
-// 	srcKey := utils.RandString(10)
-// 	destKey := "from:" + srcKey
-// 	value := utils.RandString(10)
-// 	conn := new(connection.FakeConn)
+func TestCopy(t *testing.T) {
+	testDB.Flush()
+	testMDB := NewStandaloneServer()
+	srcKey := utils.RandString(10)
+	destKey := "from:" + srcKey
+	value := utils.RandString(10)
+	conn := new(connection.SimpleConn)
 
-// 	testMDB.Exec(conn, utils.ToCmdLine("set", srcKey, value))
+	testMDB.Exec(conn, utils.ToCmdLine("set", srcKey, value))
 
-// 	// normal copy
-// 	result := testMDB.Exec(conn, utils.ToCmdLine("copy", srcKey, destKey))
-// 	asserts.AssertIntReply(t, result, 1)
-// 	result = testMDB.Exec(conn, utils.ToCmdLine("get", destKey))
-// 	asserts.AssertBulkReply(t, result, value)
+	// normal copy
+	result := testMDB.Exec(conn, utils.ToCmdLine("copy", srcKey, destKey))
+	assert.AssertIntReply(t, result, 1)
+	result = testMDB.Exec(conn, utils.ToCmdLine("get", destKey))
+	assert.AssertBulkReply(t, result, value)
 
-// 	// copy srcKey(DB 0) to destKey(DB 1)
-// 	testMDB.Exec(conn, utils.ToCmdLine("copy", srcKey, destKey, "db", "1"))
-// 	testMDB.Exec(conn, utils.ToCmdLine("select", "1"))
-// 	result = testMDB.Exec(conn, utils.ToCmdLine("get", destKey))
-// 	asserts.AssertBulkReply(t, result, value)
+	// copy srcKey(DB 0) to destKey(DB 1)
+	testMDB.Exec(conn, utils.ToCmdLine("copy", srcKey, destKey, "db", "1"))
+	testMDB.Exec(conn, utils.ToCmdLine("select", "1"))
+	result = testMDB.Exec(conn, utils.ToCmdLine("get", destKey))
+	assert.AssertBulkReply(t, result, value)
 
-// 	// test destKey already exists
-// 	testMDB.Exec(conn, utils.ToCmdLine("select", "0"))
-// 	result = testMDB.Exec(conn, utils.ToCmdLine("copy", srcKey, destKey))
-// 	asserts.AssertIntReply(t, result, 0)
+	// test destKey already exists
+	testMDB.Exec(conn, utils.ToCmdLine("select", "0"))
+	result = testMDB.Exec(conn, utils.ToCmdLine("copy", srcKey, destKey))
+	assert.AssertIntReply(t, result, 0)
 
-// 	// copy srcKey(DB 0) to destKey(DB 0) with "Replace"
-// 	value = "new:" + value
-// 	testMDB.Exec(conn, utils.ToCmdLine("set", srcKey, value)) // reset srcKey
-// 	result = testMDB.Exec(conn, utils.ToCmdLine("copy", srcKey, destKey, "replace"))
-// 	asserts.AssertIntReply(t, result, 1)
-// 	result = testMDB.Exec(conn, utils.ToCmdLine("get", destKey))
-// 	asserts.AssertBulkReply(t, result, value)
+	// copy srcKey(DB 0) to destKey(DB 0) with "Replace"
+	value = "new:" + value
+	testMDB.Exec(conn, utils.ToCmdLine("set", srcKey, value)) // reset srcKey
+	result = testMDB.Exec(conn, utils.ToCmdLine("copy", srcKey, destKey, "replace"))
+	assert.AssertIntReply(t, result, 1)
+	result = testMDB.Exec(conn, utils.ToCmdLine("get", destKey))
+	assert.AssertBulkReply(t, result, value)
 
-// 	// test copy expire time
-// 	testMDB.Exec(conn, utils.ToCmdLine("set", srcKey, value, "ex", "1000"))
-// 	result = testMDB.Exec(conn, utils.ToCmdLine("copy", srcKey, destKey, "replace"))
-// 	asserts.AssertIntReply(t, result, 1)
-// 	result = testMDB.Exec(conn, utils.ToCmdLine("ttl", srcKey))
-// 	asserts.AssertIntReplyGreaterThan(t, result, 0)
-// 	result = testMDB.Exec(conn, utils.ToCmdLine("ttl", destKey))
-// 	asserts.AssertIntReplyGreaterThan(t, result, 0)
-// }
+	// test copy expire time
+	testMDB.Exec(conn, utils.ToCmdLine("set", srcKey, value, "ex", "1000"))
+	result = testMDB.Exec(conn, utils.ToCmdLine("copy", srcKey, destKey, "replace"))
+	assert.AssertIntReply(t, result, 1)
+	result = testMDB.Exec(conn, utils.ToCmdLine("ttl", srcKey))
+	assert.AssertIntReplyGreaterThan(t, result, 0)
+	result = testMDB.Exec(conn, utils.ToCmdLine("ttl", destKey))
+	assert.AssertIntReplyGreaterThan(t, result, 0)
+}
 
 func TestScan(t *testing.T) {
 	testDB.Flush()

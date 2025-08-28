@@ -16,13 +16,12 @@ import (
 )
 
 func TestReplicationSlaveSide(t *testing.T) {
-	tmpDir, err := os.CreateTemp("", "godis")
+	tmpDir, err := os.MkdirTemp("", "godis")
 	if err != nil {
 		t.Error(err)
 		return
 	}
-	tmpDirName := tmpDir.Name()
-	aofFilename := path.Join(tmpDirName, "a.aof")
+	aofFilename := path.Join(tmpDir, "a.aof")
 	defer func() {
 		_ = os.Remove(aofFilename)
 	}()

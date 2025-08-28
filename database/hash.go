@@ -532,7 +532,7 @@ func init() {
 		attachCommandExtra([]string{redisFlagWrite, redisFlagDenyOOM, redisFlagFast}, 1, 1, 1)
 	registerCommand("HSetNX", execHSetNX, writeFirstKey, undoHSet, 4, flagWrite).
 		attachCommandExtra([]string{redisFlagWrite, redisFlagDenyOOM, redisFlagFast}, 1, 1, 1)
-	registerCommand("HGet", execHGet, readFirstKey, nil, 3, flagReadOnly).
+	registerCommand("HGet", execHGet, readFirstKey, nil, -3, flagReadOnly).
 		attachCommandExtra([]string{redisFlagReadonly, redisFlagFast}, 1, 1, 1)
 	registerCommand("HGetAll", execHGetAll, readFirstKey, nil, 2, flagReadOnly).
 		attachCommandExtra([]string{redisFlagReadonly, redisFlagRandom}, 1, 1, 1)

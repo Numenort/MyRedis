@@ -5,6 +5,7 @@ import (
 	"myredis/config"
 	"myredis/interface/myredis"
 	"myredis/protocol"
+	"myredis/tcp"
 	"os"
 	"runtime"
 	"strings"
@@ -74,6 +75,8 @@ func Info(db *Server, args [][]byte) myredis.Reply {
 		case "keyspace":
 			reply := GenMydisInfoString("keyspace", db)
 			return protocol.MakeBulkReply(reply)
+		default:
+			return protocol.MakeErrReply("Invalid section for 'info' command")
 		}
 	}
 	return protocol.MakeArgNumErrReply("info")
@@ -111,7 +114,7 @@ func GenMydisInfoString(section string, db *Server) []byte {
 		)
 		return []byte(str)
 	case "client":
-		str := fmt.Sprintf("# Clients\r\n")
+		str := fmt.Sprintf("# Clients\r\n"+"connected_clients:%d\r\n", tcp.ClientCount)
 		return []byte(str)
 	case "cluster":
 		if getMydisRunningMode() == config.ClusterMode {

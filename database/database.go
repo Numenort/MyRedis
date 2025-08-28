@@ -277,7 +277,7 @@ func (db *DB) GetVersion(key string) uint32 {
 func (db *DB) addVersion(keys ...string) {
 	for _, key := range keys {
 		versionCode := db.GetVersion(key)
-		db.versionMap.Put(key, versionCode)
+		db.versionMap.Put(key, versionCode+1)
 	}
 }
 

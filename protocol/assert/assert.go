@@ -43,6 +43,17 @@ func AssertIntReply(t *testing.T, actual myredis.Reply, expected int) {
 	}
 }
 
+func AssertIntReplyGreaterThan(t *testing.T, actual myredis.Reply, expected int) {
+	intResult, ok := actual.(*protocol.IntReply)
+	if !ok {
+		t.Errorf("expected int protocol, actually %s, %s", actual.ToBytes(), printStack())
+		return
+	}
+	if intResult.Code < int64(expected) {
+		t.Errorf("expected %d, actually %d, %s", expected, intResult.Code, printStack())
+	}
+}
+
 func AssertBulkReply(t *testing.T, actual myredis.Reply, expected string) {
 	bulkReply, ok := actual.(*protocol.BulkReply)
 	if !ok {
