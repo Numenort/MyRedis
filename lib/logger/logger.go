@@ -72,12 +72,12 @@ func NewStdoutLogger() *Logger {
 	return logger
 }
 
-// 用于文件形式存储的日志，包含路径/名称/时间/扩展名
+// 用于文件形式存储的日志
 type Settings struct {
-	Path       string
-	Name       string
-	Ext        string
-	TimeFormat string
+	Path       string // 路径
+	Name       string // 名称
+	Ext        string // 扩展名
+	TimeFormat string // 时间格式
 }
 
 // 文件存储日志

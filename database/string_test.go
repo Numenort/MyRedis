@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"math"
 	"myredis/lib/utils"
 	"myredis/protocol"
@@ -81,6 +82,23 @@ func TestSet(t *testing.T) {
 	actual = testDB.Exec(nil, utils.ToCmdLine("TTL", key))
 	print(actual.ToBytes())
 	intResult, ok := actual.(*protocol.IntReply)
+	if !ok {
+		t.Errorf("expected int protocol, actually %s", actual.ToBytes())
+		return
+	}
+	if intResult.Code <= 0 || intResult.Code > 1000 {
+		t.Errorf("expected int between [0, 1000], actually %d", intResult.Code)
+		return
+	}
+
+	// set px
+	testDB.Remove(key)
+	ttlPx := "1000000"
+	testDB.Exec(nil, utils.ToCmdLine("SET", key, value, "PX", ttlPx))
+	actual = testDB.Exec(nil, utils.ToCmdLine("GET", key))
+	assert.AssertBulkReply(t, actual, value)
+	actual = testDB.Exec(nil, utils.ToCmdLine("TTL", key))
+	intResult, ok = actual.(*protocol.IntReply)
 	if !ok {
 		t.Errorf("expected int protocol, actually %s", actual.ToBytes())
 		return
@@ -393,4 +411,391 @@ func TestStrLen_KeyNotExist(t *testing.T) {
 	}
 
 	assert.AssertIntReply(t, result, 0)
+}
+
+func TestAppend_KeyExist(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	key2 := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("Append", key, key2))
+	val, ok := actual.(*protocol.IntReply)
+	if !ok {
+		t.Errorf("expect nil bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+	assert.AssertIntReply(t, val, len(key)*2)
+}
+
+func TestAppend_KeyNotExist(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("Append", key, key))
+	val, ok := actual.(*protocol.IntReply)
+	if !ok {
+		t.Errorf("expect nil bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+	assert.AssertIntReply(t, val, len(key))
+}
+
+func TestSetRange_StringExist(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	key2 := utils.RandString(3)
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("SetRange", key, fmt.Sprint(0), key2))
+	val, ok := actual.(*protocol.IntReply)
+	if !ok {
+		t.Errorf("expect int bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	result := len(key2 + key[3:])
+	assert.AssertIntReply(t, val, result)
+}
+
+func TestSetRange_StringExist_OffsetOutOfLen(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	key2 := utils.RandString(3)
+	emptyByteLen := 5
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("SetRange", key, fmt.Sprint(len(key)+emptyByteLen), key2))
+	val, ok := actual.(*protocol.IntReply)
+	if !ok {
+		t.Errorf("expect int bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	result := len(key + string(make([]byte, emptyByteLen)) + key2)
+	assert.AssertIntReply(t, val, result)
+}
+
+func TestSetRange_StringNotExist(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("SetRange", key, fmt.Sprint(0), key))
+	val, ok := actual.(*protocol.IntReply)
+	if !ok {
+		t.Errorf("expect int bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+	assert.AssertIntReply(t, val, len(key))
+}
+
+func TestGetRange_StringExist(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(0), fmt.Sprint(len(key))))
+	val, ok := actual.(*protocol.BulkReply)
+	if !ok {
+		t.Errorf("expect bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	assert.AssertBulkReply(t, val, key)
+}
+
+func TestGetRange_RangeLargeThenDataLen(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(0), fmt.Sprint(len(key)+2)))
+	val, ok := actual.(*protocol.BulkReply)
+	if !ok {
+		t.Errorf("expect bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	assert.AssertBulkReply(t, val, key)
+}
+
+func TestGetRange_StringNotExist(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(0), fmt.Sprint(len(key))))
+	val, ok := actual.(*protocol.NullBulkReply)
+	if !ok {
+		t.Errorf("expect nil bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	assert.AssertNullBulk(t, val)
+}
+
+func TestGetRange_StringExist_GetPartial(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(0), fmt.Sprint(len(key)/2)))
+	val, ok := actual.(*protocol.BulkReply)
+	if !ok {
+		t.Errorf("expect bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	assert.AssertBulkReply(t, val, key[:(len(key)/2)+1])
+}
+
+func TestGetRange_StringExist_EndIdxOutOfRange(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	emptyByteLen := 2
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(0), fmt.Sprint(len(key)+emptyByteLen)))
+	val, ok := actual.(*protocol.BulkReply)
+	if !ok {
+		t.Errorf("expect bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	assert.AssertBulkReply(t, val, key)
+}
+
+func TestGetRange_StringExist_StartIdxEndIdxAreSame(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	emptyByteLen := 2
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(len(key)+emptyByteLen), fmt.Sprint(len(key)+emptyByteLen)))
+	val, ok := actual.(*protocol.NullBulkReply)
+	if !ok {
+		t.Errorf("expect nil bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	assert.AssertNullBulk(t, val)
+}
+
+func TestGetRange_StringExist_StartIdxGreaterThanEndIdx(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(len(key)+1), fmt.Sprint(len(key))))
+	val, ok := actual.(*protocol.NullBulkReply)
+	if !ok {
+		t.Errorf("expect nil bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	assert.AssertNullBulk(t, val)
+}
+
+func TestGetRange_StringExist_StartIdxEndIdxAreNegative(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(-1*len(key)), fmt.Sprint(-1)))
+	val, ok := actual.(*protocol.BulkReply)
+	if !ok {
+		t.Errorf("expect bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	assert.AssertBulkReply(t, val, key)
+}
+
+func TestGetRange_StringExist_StartIdxNegative(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(-1*len(key)), fmt.Sprint(len(key)/2)))
+	val, ok := actual.(*protocol.BulkReply)
+	if !ok {
+		t.Errorf("expect bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	assert.AssertBulkReply(t, val, key[0:(len(key)/2)+1])
+}
+
+func TestGetRange_StringExist_EndIdxNegative(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(0), fmt.Sprint(-len(key)/2)))
+	val, ok := actual.(*protocol.BulkReply)
+	if !ok {
+		t.Errorf("expect bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	assert.AssertBulkReply(t, val, key[0:(len(key)/2)+1])
+}
+
+func TestGetRange_StringExist_StartIsOutOfRange(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(-len(key)-3), fmt.Sprint(len(key))))
+	val, ok := actual.(*protocol.NullBulkReply)
+	if !ok {
+		t.Errorf("expect bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	assert.AssertNullBulk(t, val)
+}
+
+func TestGetRange_StringExist_EndIdxIsOutOfRange(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(0), fmt.Sprint(-len(key)-3)))
+	val, ok := actual.(*protocol.NullBulkReply)
+	if !ok {
+		t.Errorf("expect bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	assert.AssertNullBulk(t, val)
+}
+
+func TestGetRange_StringExist_StartIdxGreaterThanDataLen(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(len(key)+1), fmt.Sprint(0)))
+	val, ok := actual.(*protocol.NullBulkReply)
+	if !ok {
+		t.Errorf("expect bulk protocol, get: %s", string(actual.ToBytes()))
+		return
+	}
+
+	assert.AssertNullBulk(t, val)
+}
+
+func TestGetRange_StringExist_StartIdxIncorrectFormat(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+	incorrectValue := "incorrect"
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, incorrectValue, fmt.Sprint(0)))
+	assert.AssertErrReply(t, actual, "ERR value is not an integer or out of range")
+}
+
+func TestGetRange_StringExist_EndIdxIncorrectFormat(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+	incorrectValue := "incorrect"
+
+	actual := testDB.Exec(nil, utils.ToCmdLine("GetRange", key, fmt.Sprint(0), incorrectValue))
+	assert.AssertErrReply(t, actual, "ERR value is not an integer or out of range")
+}
+
+func TestSetBit(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	actual := testDB.Exec(nil, utils.ToCmdLine("SetBit", key, "15", "1"))
+	assert.AssertIntReply(t, actual, 0)
+	actual = testDB.Exec(nil, utils.ToCmdLine("SetBit", key, "15", "0"))
+	assert.AssertIntReply(t, actual, 1)
+	testDB.Exec(nil, utils.ToCmdLine("SetBit", key, "13", "1"))
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", key, "13"))
+	assert.AssertIntReply(t, actual, 1)
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", key+"1", "13")) // test not exist key
+	assert.AssertIntReply(t, actual, 0)
+
+	actual = testDB.Exec(nil, utils.ToCmdLine("SetBit", key, "13", "a"))
+	assert.AssertErrReply(t, actual, "ERR bit is not an integer or out of range")
+	actual = testDB.Exec(nil, utils.ToCmdLine("SetBit", key, "a", "1"))
+	assert.AssertErrReply(t, actual, "ERR bit offset is not an integer or out of range")
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", key, "a"))
+	assert.AssertErrReply(t, actual, "ERR bit offset is not an integer or out of range")
+
+	key2 := utils.RandString(11)
+	testDB.Exec(nil, utils.ToCmdLine("rpush", key2, "1"))
+	actual = testDB.Exec(nil, utils.ToCmdLine("SetBit", key2, "15", "0"))
+	assert.AssertErrReply(t, actual, "WRONGTYPE Operation against a key holding the wrong kind of value")
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", key2, "15"))
+	assert.AssertErrReply(t, actual, "WRONGTYPE Operation against a key holding the wrong kind of value")
+}
+
+func TestBitCount(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine("SetBit", key, "15", "1"))
+	testDB.Exec(nil, utils.ToCmdLine("SetBit", key, "13", "1"))
+	actual := testDB.Exec(nil, utils.ToCmdLine("BitCount", key))
+	assert.AssertIntReply(t, actual, 2)
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitCount", key, "14", "15", "BIT"))
+	assert.AssertIntReply(t, actual, 1)
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitCount", key, "16", "20", "BIT"))
+	assert.AssertIntReply(t, actual, 0)
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitCount", key, "1", "1", "BYTE"))
+	assert.AssertIntReply(t, actual, 2)
+
+	key2 := utils.RandString(11)
+	testDB.Exec(nil, utils.ToCmdLine("rpush", key2, "1"))
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitCount", key2))
+	assert.AssertErrReply(t, actual, "WRONGTYPE Operation against a key holding the wrong kind of value")
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitCount", key+"a"))
+	assert.AssertIntReply(t, actual, 0)
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitCount", key, "14", "15", "B"))
+	assert.AssertErrReply(t, actual, "ERR syntax error")
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitCount", key, "14", "A"))
+	assert.AssertErrReply(t, actual, "ERR value is not an integer or out of range")
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitCount", key, "A", "-1"))
+	assert.AssertErrReply(t, actual, "ERR value is not an integer or out of range")
+}
+
+func TestBitPos(t *testing.T) {
+	testDB.Flush()
+	key := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine("SetBit", key, "15", "1"))
+	actual := testDB.Exec(nil, utils.ToCmdLine("BitPos", key, "0"))
+	assert.AssertIntReply(t, actual, 0)
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitPos", key, "1"))
+	assert.AssertIntReply(t, actual, 15)
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitPos", key, "1", "0", "-1", "BIT"))
+	assert.AssertIntReply(t, actual, 15)
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitPos", key, "1", "1", "1", "BYTE"))
+	assert.AssertIntReply(t, actual, 15)
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitPos", key, "0", "1", "1", "BYTE"))
+	assert.AssertIntReply(t, actual, 8)
+
+	key2 := utils.RandString(12)
+	testDB.Exec(nil, utils.ToCmdLine("rpush", key2, "1"))
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitPos", key2, "1"))
+	assert.AssertErrReply(t, actual, "WRONGTYPE Operation against a key holding the wrong kind of value")
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitPos", key+"a", "1"))
+	assert.AssertIntReply(t, actual, -1)
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitPos", key, "1", "1", "15", "B"))
+	assert.AssertErrReply(t, actual, "ERR syntax error")
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitPos", key, "1", "14", "A"))
+	assert.AssertErrReply(t, actual, "ERR value is not an integer or out of range")
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitPos", key, "1", "a", "14"))
+	assert.AssertErrReply(t, actual, "ERR value is not an integer or out of range")
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitPos", key, "-1"))
+	assert.AssertErrReply(t, actual, "ERR bit is not an integer or out of range")
+}
+
+func TestRandomkey(t *testing.T) {
+	testDB.Flush()
+	for i := 0; i < 10; i++ {
+		key := utils.RandString(10)
+		testDB.Exec(nil, utils.ToCmdLine2("SET", key, key))
+	}
+	actual := testDB.Exec(nil, utils.ToCmdLine("Randomkey"))
+	assert.AssertNotError(t, actual)
 }

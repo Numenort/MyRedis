@@ -782,11 +782,11 @@ func execBitCount(db *DB, args [][]byte) myredis.Reply {
 		var err2 error
 		var startIndex, endIndex int64
 		// 解析 start 和 end
-		startIndex, err2 = strconv.ParseInt(string(args[2]), 10, 64)
+		startIndex, err2 = strconv.ParseInt(string(args[1]), 10, 64)
 		if err2 != nil {
 			return protocol.MakeErrReply("ERR value is not an integer or out of range")
 		}
-		endIndex, err2 = strconv.ParseInt(string(args[3]), 10, 64)
+		endIndex, err2 = strconv.ParseInt(string(args[2]), 10, 64)
 		if err2 != nil {
 			return protocol.MakeErrReply("ERR value is not an integer or out of range")
 		}
@@ -826,7 +826,7 @@ func execBitPos(db *DB, args [][]byte) myredis.Reply {
 	if bytes == nil {
 		return protocol.MakeIntReply(-1)
 	}
-	valStr := string(args[2])
+	valStr := string(args[1])
 	// 待查找的 0 / 1
 	var v byte
 	if valStr == "1" {
@@ -834,7 +834,7 @@ func execBitPos(db *DB, args [][]byte) myredis.Reply {
 	} else if valStr == "0" {
 		v = 0
 	} else {
-		return protocol.MakeErrReply("ERR bit is not an integer ot out of range")
+		return protocol.MakeErrReply("ERR bit is not an integer or out of range")
 	}
 
 	byteMode := true
