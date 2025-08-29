@@ -79,7 +79,7 @@ func (c *SimpleConn) notify() {
 		// 确保并发下的资源访问安全
 		c.mu.Lock()
 		if c.waiting != nil {
-			logger.Debug(fmt.Sprintf("notify %p", &c.waiting))
+			logger.Debug(fmt.Sprintf("notify %p", c.waiting))
 			close(c.waiting)
 			c.waiting = nil
 		}
@@ -93,6 +93,7 @@ func (c *SimpleConn) wait(offset int) {
 	c.mu.Lock()
 	// 如果有新的数据，不等了
 	if c.offset != offset {
+		c.mu.Unlock()
 		return
 	}
 	if c.waiting == nil {

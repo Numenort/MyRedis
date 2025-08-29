@@ -259,7 +259,7 @@ func (server *Server) connectionWithMaster(configVersion int32) (bool, error) {
 	// 告知主节点自己的 IP 地址
 	if config.Properties.SlaveAnnounceIP != "" {
 		ipCmdLine := utils.ToCmdLine("REPLCONF", "ip-address", config.Properties.SlaveAnnounceIP)
-		err := sendCmdToMaster(conn, ipCmdLine, masterChan)
+		err = sendCmdToMaster(conn, ipCmdLine, masterChan)
 		if err != nil {
 			return false, err
 		}
@@ -506,7 +506,7 @@ func (server *Server) slaveCron() {
 
 // 与主节点进行重连
 func (server *Server) reconnectWithMaster() error {
-	logger.Info("reconnectioning with master")
+	logger.Info("reconnecting with master")
 	server.slaveStatus.mutex.Lock()
 	defer server.slaveStatus.mutex.Unlock()
 

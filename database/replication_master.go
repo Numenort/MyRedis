@@ -92,6 +92,7 @@ package database
 import (
 	"errors"
 	"fmt"
+	"io"
 	"myredis/interface/myredis"
 	"myredis/lib/logger"
 	"myredis/lib/sync/atomic"
@@ -148,7 +149,7 @@ func (backLog *replBacklog) getSnapshotAfter(beginOffset int64) ([]byte, int64) 
 }
 
 // 检查给定偏移量是否在有效范围内
-func (backLog *replBacklog) isVaildOffset(offset int64) bool {
+func (backLog *replBacklog) isValidOffset(offset int64) bool {
 	return offset >= backLog.beginOffset && offset < backLog.currentOffset
 }
 
@@ -171,13 +172,13 @@ type replAofListener struct {
 
 // AOF 持久化模块中，收到命令时调用的回调函数
 func (listener *replAofListener) Callback(cmdLines []CmdLine) {
-	listener.mdb.slaveStatus.mutex.Lock()
+	listener.mdb.masterStatus.mu.Lock()
 	// 持久化收到命令时，主节点将命令写入缓冲区，后续复制给从节点
 	for _, cmdLine := range cmdLines {
 		reply := protocol.MakeMultiBulkReply(cmdLine)
 		listener.backlog.appendBytes(reply.ToBytes())
 	}
-	listener.mdb.slaveStatus.mutex.Unlock()
+	listener.mdb.masterStatus.mu.Unlock()
 	// 全量同步已完成
 	if listener.readyToSend {
 		if err := listener.mdb.masterSendUpdatesToSlave(); err != nil {
@@ -309,11 +310,11 @@ func (server *Server) saveForReplication() error {
 // 主要包含：发送 RDB 文件、发送增量数据
 func (server *Server) masterFullReSyncWithSlave(slave *slaveClient) error {
 	// 1.首先发送响应头
-	header := "+FULLRESYNC" + server.masterStatus.replID + " " +
+	header := "+FULLRESYNC " + server.masterStatus.replID + " " +
 		strconv.FormatInt(server.masterStatus.backlog.beginOffset, 10) + protocol.CRLF
 	_, err := slave.conn.Write([]byte(header))
 	if err != nil {
-		return err
+		return fmt.Errorf("write replication header to slave failed: %v", err)
 	}
 
 	// 2.发送 RDB 文件
@@ -335,7 +336,13 @@ func (server *Server) masterFullReSyncWithSlave(slave *slaveClient) error {
 		return fmt.Errorf("write rdb header to slave failed: %v", err)
 	}
 
-	// 5.发送缓冲区中的所有数据，用于增量同步
+	// 5.发送 rdb 文件体
+	_, err = io.Copy(slave.conn, rdbFile)
+	if err != nil {
+		return fmt.Errorf("write rdb file to slave failed: %v", err)
+	}
+
+	// 6.发送缓冲区中的所有数据，用于增量同步
 	server.masterStatus.mu.RLock()
 	backlog, currentOffset := server.masterStatus.backlog.getSnapshot()
 	server.masterStatus.mu.RUnlock()
@@ -361,12 +368,12 @@ func (server *Server) masterTryPartialSyncWithSlave(slave *slaveClient, replID s
 		return errCannotPartialSync
 	}
 	// 检查请求的偏移量是否有效
-	if !server.masterStatus.backlog.isVaildOffset(slaveOffset) {
+	if !server.masterStatus.backlog.isValidOffset(slaveOffset) {
 		server.masterStatus.mu.RUnlock()
 		return errCannotPartialSync
 	}
 	// 获取增量数据
-	backlog, currentOffset := server.masterStatus.backlog.getSnapshot()
+	backlog, currentOffset := server.masterStatus.backlog.getSnapshotAfter(slaveOffset)
 	server.masterStatus.mu.RUnlock()
 
 	// 发送响应头
@@ -492,7 +499,7 @@ const maxBacklogSize = 10 * 1024 * 1024 // 10MB
 
 // 主节点周期执行的任务
 // 添加 PING 命令维护状态、对从节点发送更新、
-func (server *Server) masterCorn() {
+func (server *Server) masterCron() {
 	server.masterStatus.mu.Lock()
 	if len(server.masterStatus.slaveMap) == 0 {
 		// 如果没有从节点
@@ -600,8 +607,8 @@ func (server *Server) setSlaveOnline(slave *slaveClient, currentOffset int64) {
 	defer server.masterStatus.mu.Unlock()
 	slave.state = slaveStateOnline
 	slave.offset = currentOffset
-	// 从等待集合中移除
-	delete(server.masterStatus.waitSlaves, slave)
+	// // 从等待集合中移除
+	// delete(server.masterStatus.waitSlaves, slave)
 	server.masterStatus.onlineSlaves[slave] = struct{}{}
 }
 

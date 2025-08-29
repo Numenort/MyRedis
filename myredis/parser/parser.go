@@ -59,7 +59,7 @@ func ParseOne(data []byte) (myredis.Reply, error) {
 	if payload == nil {
 		return nil, errors.New("no protocol")
 	}
-	return payload.Data, nil
+	return payload.Data, payload.Err
 }
 
 // 从 reader 读取数据并逐步解析为协议单元，通过 channel 向外发送解析结果或错误，支持流式处理

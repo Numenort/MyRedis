@@ -59,9 +59,9 @@ func NewStandaloneServer() *Server {
 	server.hub = pubsub.MakeHub()
 
 	// 初始化 AOF 持久化
-	vaildAof := false
+	validAof := false
 	if config.Properties.AppendOnly {
-		vaildAof = fileExists(config.Properties.AppendFilename)
+		validAof = fileExists(config.Properties.AppendFilename)
 		// 创建 AOF 管理器
 		aofHandler, err := NewPersister(
 			server,
@@ -76,7 +76,7 @@ func NewStandaloneServer() *Server {
 	}
 
 	// 如果配置了 RDB 文件且没有有效的 AOF 文件，则尝试加载 RDB 文件
-	if config.Properties.RDBFilename != "" && !vaildAof {
+	if config.Properties.RDBFilename != "" && !validAof {
 		err := server.loadRdbFile()
 		if err != nil {
 			logger.Error(err)
@@ -98,7 +98,7 @@ func (server *Server) startReplCron() {
 		ticker := time.Tick(10 * time.Second)
 		for range ticker {
 			mdb.slaveCron()
-			mdb.masterCorn()
+			mdb.masterCron()
 		}
 	}(server)
 }
@@ -126,7 +126,7 @@ func (server *Server) mustSelectDB(index int) *DB {
 
 // 利用新数据库的内容替换掉旧数据库
 func (server *Server) loadDB(dbIndex int, newDB *DB) myredis.Reply {
-	if dbIndex > len(server.dbSet) || dbIndex < 0 {
+	if dbIndex >= len(server.dbSet) || dbIndex < 0 {
 		return protocol.MakeErrReply("ERR DB index is out of range")
 	}
 	oldDB := server.mustSelectDB(dbIndex)
@@ -234,7 +234,7 @@ func (server *Server) Exec(c myredis.Connection, cmdLine [][]byte) (result myred
 			return protocol.MakeArgNumErrReply(cmdName)
 		}
 		if c.InMultiState() {
-			return protocol.MakeErrReply("ERR command 'FlushDB' cannot be used int Multi")
+			return protocol.MakeErrReply("ERR command 'FlushDB' cannot be used int MULTI")
 		}
 		return server.execFlushDB(c.GetDBIndex())
 	} else if cmdName == "save" {
@@ -351,7 +351,7 @@ func (server *Server) SetKeyDeletedCallback(callback database.KeyEventCallback) 
 
 // 新键被插入时的回调函数
 func (server *Server) SetKeyInsertedCallback(callback database.KeyEventCallback) {
-	server.deleteCallback = callback
+	server.insertCallback = callback
 	for i := range server.dbSet {
 		db := server.mustSelectDB(i)
 		db.insertCallback = callback
