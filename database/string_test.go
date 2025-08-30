@@ -790,6 +790,91 @@ func TestBitPos(t *testing.T) {
 	assert.AssertErrReply(t, actual, "ERR bit is not an integer or out of range")
 }
 
+func TestBitOp(t *testing.T) {
+	testDB.Flush()
+
+	// 准备测试数据
+	key1 := utils.RandString(10)
+	key2 := utils.RandString(10)
+	destKey := utils.RandString(10)
+
+	// 设置一些位
+	testDB.Exec(nil, utils.ToCmdLine("SetBit", key1, "7", "1"))
+	testDB.Exec(nil, utils.ToCmdLine("SetBit", key1, "15", "1"))
+	testDB.Exec(nil, utils.ToCmdLine("SetBit", key2, "7", "1"))
+	testDB.Exec(nil, utils.ToCmdLine("SetBit", key2, "23", "1"))
+
+	// 测试 AND 操作
+	actual := testDB.Exec(nil, utils.ToCmdLine("BitOp", "AND", destKey, key1, key2))
+	assert.AssertIntReply(t, actual, 3) // 返回结果字节长度
+
+	// 验证 AND 结果
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", destKey, "7"))
+	assert.AssertIntReply(t, actual, 1) // 7位应该为1（两个都有）
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", destKey, "15"))
+	assert.AssertIntReply(t, actual, 0) // 15位应该为0（只有key1有）
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", destKey, "23"))
+	assert.AssertIntReply(t, actual, 0) // 23位应该为0（只有key2有）
+
+	// 测试 OR 操作
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitOp", "OR", destKey, key1, key2))
+	assert.AssertIntReply(t, actual, 3)
+
+	// 验证 OR 结果
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", destKey, "7"))
+	assert.AssertIntReply(t, actual, 1) // 7位应该为1
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", destKey, "15"))
+	assert.AssertIntReply(t, actual, 1) // 15位应该为1
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", destKey, "23"))
+	assert.AssertIntReply(t, actual, 1) // 23位应该为1
+
+	// 测试 XOR 操作
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitOp", "XOR", destKey, key1, key2))
+	assert.AssertIntReply(t, actual, 3)
+
+	// 验证 XOR 结果
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", destKey, "7"))
+	assert.AssertIntReply(t, actual, 0) // 7位应该为0（两个都有，异或为0）
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", destKey, "15"))
+	assert.AssertIntReply(t, actual, 1) // 15位应该为1（只有key1有）
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", destKey, "23"))
+	assert.AssertIntReply(t, actual, 1) // 23位应该为1（只有key2有）
+
+	// 测试 NOT 操作
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitOp", "NOT", destKey, key1))
+	assert.AssertIntReply(t, actual, 2)
+
+	// 验证 NOT 结果
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", destKey, "7"))
+	assert.AssertIntReply(t, actual, 0) // 原来是1，NOT后为0
+	actual = testDB.Exec(nil, utils.ToCmdLine("GetBit", destKey, "15"))
+	assert.AssertIntReply(t, actual, 0) // 原来是1，NOT后为0
+
+	// 测试错误情况
+	// 参数数量错误
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitOp", "AND"))
+	assert.AssertErrReply(t, actual, "ERR wrong number of arguments for 'bitop' command")
+
+	// NOT操作参数数量错误
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitOp", "NOT", destKey, key1, key2))
+	assert.AssertErrReply(t, actual, "ERR BITOP NOT must be called with a single source key")
+
+	// 无效操作
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitOp", "INVALID", destKey, key1))
+	assert.AssertErrReply(t, actual, "ERR syntax error")
+
+	// 测试不存在的键
+	nonExistKey := utils.RandString(10)
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitOp", "AND", destKey, nonExistKey, key1))
+	assert.AssertIntReply(t, actual, 2) // 应该正常处理不存在的键
+
+	// 测试类型错误
+	listKey := utils.RandString(10)
+	testDB.Exec(nil, utils.ToCmdLine("LPush", listKey, "value"))
+	actual = testDB.Exec(nil, utils.ToCmdLine("BitOp", "AND", destKey, listKey, key1))
+	assert.AssertErrReply(t, actual, "WRONGTYPE Operation against a key holding the wrong kind of value")
+}
+
 func TestRandomkey(t *testing.T) {
 	testDB.Flush()
 	for i := 0; i < 10; i++ {

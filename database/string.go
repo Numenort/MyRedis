@@ -889,6 +889,135 @@ func execBitPos(db *DB, args [][]byte) myredis.Reply {
 	return protocol.MakeIntReply(offset)
 }
 
+// 返回 BitOp 命令涉及的键
+func prepareBitOp(args [][]byte) ([]string, []string) {
+	destKey := string(args[1])
+	sourceKeys := make([]string, len(args)-2)
+	for i, arg := range args[2:] {
+		sourceKeys[i] = string(arg)
+	}
+	return []string{destKey}, sourceKeys
+}
+
+// 生成撤销 BitOp 的命令
+func undoBitOp(db *DB, args [][]byte) []CmdLine {
+	destKey := string(args[1])
+	return rollbackGivenKeys(db, destKey)
+}
+
+// 对多个位图进行位操作，destKey 为覆盖式
+// 命令格式：BITOP <operation> destkey key [key ...]
+func execBitOp(db *DB, args [][]byte) myredis.Reply {
+	if len(args) < 3 {
+		return protocol.MakeArgNumErrReply("bitop")
+	}
+
+	op := strings.ToLower(string(args[0]))
+	destKey := string(args[1])
+
+	// 检查参数数量是否匹配
+	switch op {
+	case "and", "or", "xor":
+		// 这些操作需要至少一个源键
+		if len(args) < 3 {
+			return protocol.MakeErrReply("ERR wrong number of arguments for 'bitop' command")
+		}
+	case "not":
+		// NOT操作只接受一个源键
+		if len(args) != 3 {
+			return protocol.MakeErrReply("ERR BITOP NOT must be called with a single source key")
+		}
+	default:
+		return protocol.MakeErrReply("ERR syntax error")
+	}
+
+	// 解析 key
+	sourceKeys := make([]string, len(args)-2)
+	for i, arg := range args[2:] {
+		sourceKeys[i] = string(arg)
+	}
+
+	// 第一个参与的 key
+	firstKey := sourceKeys[0]
+	firstBytes, errReply := db.getAsString(firstKey)
+	if errReply != nil {
+		return errReply
+	}
+
+	var result *bitmap.Bitmap
+	if firstBytes == nil {
+		result = bitmap.New()
+	} else {
+		result = bitmap.FromBytes(firstBytes)
+	}
+
+	switch op {
+	case "and":
+		if len(sourceKeys) > 1 {
+			otherBitmaps := make([]*bitmap.Bitmap, len(sourceKeys)-1)
+			for i, key := range sourceKeys[1:] {
+				bytes, errReply := db.getAsString(key)
+				if errReply != nil {
+					return errReply
+				}
+				if bytes == nil {
+					otherBitmaps[i] = bitmap.New()
+				} else {
+					otherBitmaps[i] = bitmap.FromBytes(bytes)
+				}
+			}
+			result = result.And(otherBitmaps...)
+		}
+	case "or":
+		if len(sourceKeys) > 1 {
+			otherBitmaps := make([]*bitmap.Bitmap, len(sourceKeys)-1)
+			for i, key := range sourceKeys[1:] {
+				bytes, errReply := db.getAsString(key)
+				if errReply != nil {
+					return errReply
+				}
+				if bytes == nil {
+					otherBitmaps[i] = bitmap.New()
+				} else {
+					otherBitmaps[i] = bitmap.FromBytes(bytes)
+				}
+			}
+			result = result.Or(otherBitmaps...)
+		}
+	case "xor":
+		if len(sourceKeys) > 1 {
+			otherBitmaps := make([]*bitmap.Bitmap, len(sourceKeys)-1)
+			for i, key := range sourceKeys[1:] {
+				bytes, errReply := db.getAsString(key)
+				if errReply != nil {
+					return errReply
+				}
+				if bytes == nil {
+					otherBitmaps[i] = bitmap.New()
+				} else {
+					otherBitmaps[i] = bitmap.FromBytes(bytes)
+				}
+			}
+			result = result.Xor(otherBitmaps...)
+		}
+	case "not":
+		if firstBytes == nil {
+			// 如果源键不存在，NOT 操作结果为空 bitmap
+			result = bitmap.New()
+		} else {
+			result = result.Not()
+		}
+	}
+
+	// 设置 destKey
+	resultBytes := result.ToBytes()
+	db.PutEntity(destKey, &database.DataEntity{
+		Data: resultBytes,
+	})
+	db.addAof(utils.ToCmdLine3("bitop", args...))
+	return protocol.MakeIntReply(int64(len(resultBytes)))
+}
+
 // 获取一个随机的 key
 func getRandomKey(db *DB, args [][]byte) myredis.Reply {
 	key := db.data.RandomKeys(1)
@@ -951,6 +1080,8 @@ func init() {
 		attachCommandExtra([]string{redisFlagReadonly}, 1, 1, 1)
 	registerCommand("BitPos", execBitPos, readFirstKey, nil, -3, flagReadOnly).
 		attachCommandExtra([]string{redisFlagReadonly}, 1, 1, 1)
+	registerCommand("BitOp", execBitOp, prepareBitOp, undoBitOp, -4, flagWrite).
+		attachCommandExtra([]string{redisFlagWrite, redisFlagDenyOOM}, 1, -1, 1)
 
 	registerCommand("Randomkey", getRandomKey, readAllKeys, nil, 1, flagReadOnly).
 		attachCommandExtra([]string{redisFlagReadonly, redisFlagRandom}, 1, 1, 1)

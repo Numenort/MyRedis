@@ -64,6 +64,67 @@ func (b *Bitmap) GetBit(offset int64) byte {
 	return ((*b)[byteIndex] >> bitOffset) & 0x01
 }
 
+// 二元操作的通用实现，对两个或多个bitmap执行指定的字节级操作
+func (b *Bitmap) binaryOP(op func(byte, byte) byte, bitmaps ...*Bitmap) *Bitmap {
+	if len(bitmaps) == 0 {
+		// 没有其他 bitmap 参与位运算
+		result := make([]byte, len(*b))
+		copy(result, *b)
+		return FromBytes(result)
+	}
+	// 找到所有位图中最大长度
+	maxLen := len(*b)
+	for _, bm := range bitmaps {
+		if maxLen < len(*bm) {
+			maxLen = len(*bm)
+		}
+	}
+
+	result := make([]byte, maxLen)
+	// 遍历多个 bitmap 进行位运算
+	for i := 0; i < maxLen; i++ {
+		var currentByte byte = 0
+		if i < len(*b) {
+			currentByte = (*b)[i]
+		}
+		for _, bm := range bitmaps {
+			var otherByte byte = 0
+			if i < len(*bm) {
+				otherByte = (*bm)[i]
+			}
+			currentByte = op(currentByte, otherByte)
+		}
+		result[i] = currentByte
+	}
+	return FromBytes(result)
+}
+
+func (b *Bitmap) And(bitmaps ...*Bitmap) *Bitmap {
+	return b.binaryOP(func(a, b byte) byte {
+		return a & b
+	}, bitmaps...)
+}
+
+func (b *Bitmap) Or(bitmaps ...*Bitmap) *Bitmap {
+	return b.binaryOP(func(a, b byte) byte {
+		return a | b
+	}, bitmaps...)
+}
+
+func (b *Bitmap) Xor(bitmaps ...*Bitmap) *Bitmap {
+	return b.binaryOP(func(a, b byte) byte {
+		return a ^ b
+	}, bitmaps...)
+}
+
+func (b *Bitmap) Not() *Bitmap {
+	result := make([]byte, len(*b))
+	for i := 0; i < len(*b); i++ {
+		result[i] = ^(*b)[i]
+	}
+	return FromBytes(result)
+}
+
 // 是否继续遍历
 type Callback func(offset int64, val byte) bool
 
