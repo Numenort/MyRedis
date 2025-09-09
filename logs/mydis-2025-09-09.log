@@ -1,0 +1,164 @@
+2025/09/09 11:24:05 [INFO][server.go:48] bind: 0.0.0.0:6399, start listening...
+2025/09/09 11:25:16 [INFO][server.go:89] accept link
+2025/09/09 11:25:36 [ERROR][replication_slave.go:157] connect to master failed: dial tcp 0.0.0.0:6499: connect: connection refused
+2025/09/09 11:25:39 [ERROR][replication_slave.go:157] connect to master failed: dial tcp 0.0.0.0:6499: connect: connection refused
+2025/09/09 11:25:43 [ERROR][replication_slave.go:157] connect to master failed: dial tcp 0.0.0.0:6599: connect: connection refused
+2025/09/09 11:25:44 [INFO][server.go:69] connection closed: 127.0.0.1:42650
+2025/09/09 11:26:55 [INFO][server.go:63] get exit signal
+2025/09/09 11:26:57 [INFO][server.go:48] bind: 0.0.0.0:6499, start listening...
+2025/09/09 11:27:43 [INFO][server.go:89] accept link
+2025/09/09 11:27:43 [WARNING][server.go:175] error occurs: runtime error: invalid memory address or nil pointer dereference
+goroutine 74 [running]:
+runtime/debug.Stack()
+	/usr/local/go/src/runtime/debug/stack.go:26 +0x5e
+myredis/database.(*Server).Exec.func1()
+	/home/yufangxu/learnGo/myRedis/database/server.go:175 +0x45
+panic({0x72f020?, 0xa64b90?})
+	/usr/local/go/src/runtime/panic.go:787 +0x132
+myredis/database.(*Server).execReplConf(0xc0000e4460, {0x81d058, 0xc00b836000}, {0xc006cc0018, 0x2, 0xc000069ea0?})
+	/home/yufangxu/learnGo/myRedis/database/replication_master.go:481 +0x28e
+myredis/database.(*Server).Exec(0xc0000e4460, {0x81d058, 0xc00b836000}, {0xc006cc0000, 0x3, 0x3})
+	/home/yufangxu/learnGo/myRedis/database/server.go:258 +0xf25
+myredis/myredis/server.(*Handler).Handle(0xc0000e4730, {0xc0000ec138?, 0x0?}, {0x81abf8, 0xc00b816018})
+	/home/yufangxu/learnGo/myRedis/myredis/server/server.go:92 +0x15d
+myredis/tcp.ListenAndServe.func2()
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:98 +0x5c
+created by myredis/tcp.ListenAndServe in goroutine 1
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:92 +0x285
+
+2025/09/09 11:36:43 [INFO][server.go:69] connection closed: 127.0.0.1:59490
+2025/09/09 11:36:44 [INFO][server.go:63] get exit signal
+2025/09/09 11:36:44 [INFO][server.go:67] Shuting down...
+2025/09/09 11:47:13 [INFO][server.go:48] bind: 0.0.0.0:6499, start listening...
+2025/09/09 11:47:33 [INFO][server.go:89] accept link
+2025/09/09 11:47:33 [WARNING][server.go:175] error occurs: runtime error: invalid memory address or nil pointer dereference
+goroutine 63 [running]:
+runtime/debug.Stack()
+	/usr/local/go/src/runtime/debug/stack.go:26 +0x5e
+myredis/database.(*Server).Exec.func1()
+	/home/yufangxu/learnGo/myRedis/database/server.go:175 +0x45
+panic({0x72f020?, 0xa64b90?})
+	/usr/local/go/src/runtime/panic.go:787 +0x132
+myredis/database.(*Server).execReplConf(0xc000180410, {0x81d058, 0xc00017e090}, {0xc00009a068, 0x2, 0xc000069ea0?})
+	/home/yufangxu/learnGo/myRedis/database/replication_master.go:481 +0x28e
+myredis/database.(*Server).Exec(0xc000180410, {0x81d058, 0xc00017e090}, {0xc00009a050, 0x3, 0x3})
+	/home/yufangxu/learnGo/myRedis/database/server.go:258 +0xf25
+myredis/myredis/server.(*Handler).Handle(0xc0001806e0, {0xc0001860c8?, 0x0?}, {0x81abf8, 0xc00011a100})
+	/home/yufangxu/learnGo/myRedis/myredis/server/server.go:92 +0x15d
+myredis/tcp.ListenAndServe.func2()
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:98 +0x5c
+created by myredis/tcp.ListenAndServe in goroutine 1
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:92 +0x285
+
+2025/09/09 11:54:38 [INFO][server.go:69] connection closed: 127.0.0.1:47800
+2025/09/09 11:54:52 [INFO][server.go:63] get exit signal
+2025/09/09 11:54:52 [INFO][server.go:67] Shuting down...
+2025/09/09 11:54:54 [INFO][server.go:48] bind: 0.0.0.0:6499, start listening...
+2025/09/09 11:55:22 [INFO][server.go:89] accept link
+2025/09/09 11:55:22 [WARNING][server.go:175] error occurs: runtime error: invalid memory address or nil pointer dereference
+goroutine 59 [running]:
+runtime/debug.Stack()
+	/usr/local/go/src/runtime/debug/stack.go:26 +0x5e
+myredis/database.(*Server).Exec.func1()
+	/home/yufangxu/learnGo/myRedis/database/server.go:175 +0x45
+panic({0x72f020?, 0xa64b90?})
+	/usr/local/go/src/runtime/panic.go:787 +0x132
+myredis/database.(*Server).execReplConf(0xc0000e4460, {0x81d098, 0xc0000e2090}, {0xc0000e4798, 0x2, 0xc0005106a0?})
+	/home/yufangxu/learnGo/myRedis/database/replication_master.go:481 +0x2ae
+myredis/database.(*Server).Exec(0xc0000e4460, {0x81d098, 0xc0000e2090}, {0xc0000e4780, 0x3, 0x3})
+	/home/yufangxu/learnGo/myRedis/database/server.go:258 +0xf25
+myredis/myredis/server.(*Handler).Handle(0xc0000e4730, {0xc0000ea138?, 0x0?}, {0x81ac38, 0xc00006a100})
+	/home/yufangxu/learnGo/myRedis/myredis/server/server.go:92 +0x15d
+myredis/tcp.ListenAndServe.func2()
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:98 +0x5c
+created by myredis/tcp.ListenAndServe in goroutine 1
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:92 +0x285
+
+2025/09/09 11:55:37 [INFO][server.go:63] get exit signal
+2025/09/09 11:55:37 [INFO][server.go:67] Shuting down...
+2025/09/09 11:55:37 [INFO][server.go:103] handler shutting down...
+2025/09/09 11:55:37 [INFO][server.go:69] connection closed: 127.0.0.1:36062
+2025/09/09 11:58:37 [INFO][server.go:48] bind: 0.0.0.0:6499, start listening...
+2025/09/09 12:02:32 [INFO][server.go:48] bind: 0.0.0.0:6499, start listening...
+2025/09/09 12:03:08 [INFO][server.go:48] bind: 0.0.0.0:6499, start listening...
+2025/09/09 12:04:11 [INFO][server.go:89] accept link
+2025/09/09 12:04:29 [ERROR][replication_slave.go:157] connect to master failed: dial tcp 0.0.0.0:6399: connect: connection refused
+2025/09/09 12:05:12 [ERROR][main.go:66] listen tcp 0.0.0.0:6499: bind: address already in use
+2025/09/09 12:05:49 [INFO][server.go:63] get exit signal
+2025/09/09 12:05:49 [INFO][server.go:67] Shuting down...
+2025/09/09 12:05:49 [INFO][server.go:103] handler shutting down...
+2025/09/09 12:05:49 [INFO][server.go:69] connection closed: 127.0.0.1:44050
+2025/09/09 12:05:50 [INFO][server.go:48] bind: 0.0.0.0:6499, start listening...
+2025/09/09 12:05:51 [INFO][server.go:63] get exit signal
+2025/09/09 12:05:51 [INFO][server.go:67] Shuting down...
+2025/09/09 12:05:54 [INFO][server.go:48] bind: 0.0.0.0:6499, start listening...
+2025/09/09 12:06:23 [INFO][server.go:48] bind: 0.0.0.0:6499, start listening...
+2025/09/09 12:06:51 [INFO][server.go:89] accept link
+2025/09/09 12:06:51 [ERROR][replication_slave.go:157] unexpected auth response: -Err unknown
+
+2025/09/09 12:07:09 [INFO][server.go:69] connection closed: 127.0.0.1:45216
+2025/09/09 12:07:13 [INFO][server.go:89] accept link
+2025/09/09 12:07:13 [WARNING][server.go:175] error occurs: runtime error: invalid memory address or nil pointer dereference
+goroutine 122 [running]:
+runtime/debug.Stack()
+	/usr/local/go/src/runtime/debug/stack.go:26 +0x6b
+myredis/database.(*Server).Exec.func1()
+	/home/yufangxu/learnGo/myRedis/database/server.go:175 +0x4f
+panic({0x8f8680?, 0xbeed30?})
+	/usr/local/go/src/runtime/panic.go:787 +0x136
+myredis/database.(*Server).execReplConf(0xc0001924b0, {0x9b3eb0, 0xc000190090}, {0xc00b358108, 0x2, 0x2})
+	/home/yufangxu/learnGo/myRedis/database/replication_master.go:481 +0x95a
+myredis/database.(*Server).Exec(0xc0001924b0, {0x9b3eb0, 0xc000190090}, {0xc00b3580f0, 0x3, 0x3})
+	/home/yufangxu/learnGo/myRedis/database/server.go:258 +0x266d
+myredis/myredis/server.(*Handler).Handle(0xc00b80c050, {0x9b0830, 0xc204c0}, {0x9b2398, 0xc00b80a020})
+	/home/yufangxu/learnGo/myRedis/myredis/server/server.go:92 +0x694
+myredis/tcp.ListenAndServe.func2()
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:98 +0xf4
+created by myredis/tcp.ListenAndServe in goroutine 1
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:92 +0x6eb
+
+2025/09/09 12:07:44 [INFO][server.go:48] bind: 0.0.0.0:6499, start listening...
+2025/09/09 12:07:51 [INFO][server.go:89] accept link
+2025/09/09 12:07:51 [WARNING][server.go:175] error occurs: runtime error: invalid memory address or nil pointer dereference
+goroutine 11 [running]:
+runtime/debug.Stack()
+	/usr/local/go/src/runtime/debug/stack.go:26 +0x6b
+myredis/database.(*Server).Exec.func1()
+	/home/yufangxu/learnGo/myRedis/database/server.go:175 +0x4f
+panic({0x8f8680?, 0xbeed30?})
+	/usr/local/go/src/runtime/panic.go:787 +0x136
+myredis/database.(*Server).execReplConf(0xc0001924b0, {0x9b3eb0, 0xc00b3c6000}, {0xc0001927e8, 0x2, 0x2})
+	/home/yufangxu/learnGo/myRedis/database/replication_master.go:481 +0x95a
+myredis/database.(*Server).Exec(0xc0001924b0, {0x9b3eb0, 0xc00b3c6000}, {0xc0001927d0, 0x3, 0x3})
+	/home/yufangxu/learnGo/myRedis/database/server.go:258 +0x266d
+myredis/myredis/server.(*Handler).Handle(0xc000192780, {0x9b0830, 0xc204c0}, {0x9b2398, 0xc00b3b2018})
+	/home/yufangxu/learnGo/myRedis/myredis/server/server.go:92 +0x694
+myredis/tcp.ListenAndServe.func2()
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:98 +0xf4
+created by myredis/tcp.ListenAndServe in goroutine 1
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:92 +0x6eb
+
+2025/09/09 12:09:10 [INFO][server.go:48] bind: 0.0.0.0:6499, start listening...
+2025/09/09 12:09:16 [INFO][server.go:89] accept link
+2025/09/09 12:09:16 [WARNING][server.go:175] error occurs: runtime error: invalid memory address or nil pointer dereference
+goroutine 59 [running]:
+runtime/debug.Stack()
+	/usr/local/go/src/runtime/debug/stack.go:26 +0x6b
+myredis/database.(*Server).Exec.func1()
+	/home/yufangxu/learnGo/myRedis/database/server.go:175 +0x4f
+panic({0x8f8680?, 0xbeed30?})
+	/usr/local/go/src/runtime/panic.go:787 +0x136
+myredis/database.(*Server).execReplConf(0xc0001924b0, {0x9b3eb0, 0xc000190090}, {0xc00b904018, 0x2, 0x2})
+	/home/yufangxu/learnGo/myRedis/database/replication_master.go:481 +0x95a
+myredis/database.(*Server).Exec(0xc0001924b0, {0x9b3eb0, 0xc000190090}, {0xc00b904000, 0x3, 0x3})
+	/home/yufangxu/learnGo/myRedis/database/server.go:258 +0x266d
+myredis/myredis/server.(*Handler).Handle(0xc000192780, {0x9b0830, 0xc204c0}, {0x9b2398, 0xc0000be118})
+	/home/yufangxu/learnGo/myRedis/myredis/server/server.go:92 +0x694
+myredis/tcp.ListenAndServe.func2()
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:98 +0xf4
+created by myredis/tcp.ListenAndServe in goroutine 1
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:92 +0x6eb
+
+2025/09/09 12:09:40 [INFO][server.go:69] connection closed: 127.0.0.1:50242
+2025/09/09 12:19:47 [INFO][server.go:48] bind: 0.0.0.0:6499, start listening...
+2025/09/09 12:20:19 [INFO][server.go:89] accept link

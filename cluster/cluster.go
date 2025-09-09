@@ -1,6 +1,7 @@
 package cluster
 
 import (
+	"fmt"
 	"myredis/cluster/core"
 	"myredis/cluster/raft"
 	"myredis/config"
@@ -29,7 +30,7 @@ func MakeCluster() *core.Cluster {
 	})
 	if err != nil {
 		logger.Error(err.Error())
-		panic(err)
+		panic(fmt.Sprintf("errors occur in MakeCluster: %v", err))
 	}
 	return cluster
 }

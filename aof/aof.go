@@ -147,6 +147,7 @@ func (persister *Persister) listenCmdLine() {
 func (persister *Persister) WriteAof(payload *payload) {
 	// 设置为空切片
 	persister.buffer = persister.buffer[:0]
+	// 确保重写过程中不会有其他 goroutine 同时写入 AOF 文件
 	persister.pausingAof.Lock()
 	defer persister.pausingAof.Unlock()
 	// 判断是否需要写入数据库切换

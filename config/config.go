@@ -42,7 +42,7 @@ type ServerProperties struct {
 	ClusterEnable     bool   `cfg:"cluster-enable"`         // 是否启用集群模式
 	ClusterAsSeed     bool   `cfg:"cluster-as-seed"`        // 是否作为种子节点
 	ClusterSeed       string `cfg:"cluster-seed"`           // 种子节点地址列表
-	RaftListenAddr    string `cfg:"raft-listen-addr"`       // Raft 协议监听地址（内部通信）
+	RaftListenAddr    string `cfg:"raft-listen-address"`    // Raft 协议监听地址（内部通信）
 	RaftAdvertiseAddr string `cfg:"raft-advertise-address"` // Raft 对外公布的地址
 	MasterInCluster   string `cfg:"master-in-cluster"`      // 当前实例在集群中所属的主节点地址
 

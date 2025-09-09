@@ -14,7 +14,7 @@ import (
 func TestClient(t *testing.T) {
 	logger.Setup(&logger.Settings{
 		Path:       "logs",
-		Name:       "godis",
+		Name:       "myredis",
 		Ext:        ".log",
 		TimeFormat: "2006-01-02",
 	})

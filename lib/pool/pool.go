@@ -126,8 +126,8 @@ func (pool *Pool) Put(x interface{}) {
 		return
 	default:
 		// 销毁该对象，对象数量减少
-		pool.mu.Unlock()
 		pool.activateCount--
+		pool.mu.Unlock()
 		pool.finalizer(x)
 	}
 }

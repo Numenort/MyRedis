@@ -324,7 +324,7 @@ func (server *Server) masterFullReSyncWithSlave(slave *slaveClient) error {
 	}
 	defer rdbFile.Close()
 
-	// 3.设置主节点状态
+	// 3.设置从节点状态
 	slave.state = slaveStateSendingRDB
 	rdbInfo, _ := os.Stat(server.masterStatus.rdbFilename)
 	rdbSize := rdbInfo.Size()
@@ -456,9 +456,9 @@ func (server *Server) execReplConf(c myredis.Connection, args [][]byte) myredis.
 	if len(args)%2 != 0 {
 		return protocol.MakeSyntaxErrReply()
 	}
-	server.masterStatus.mu.Lock()
+	server.masterStatus.mu.RLock()
 	slave := server.masterStatus.slaveMap[c]
-	server.masterStatus.mu.Unlock()
+	server.masterStatus.mu.RUnlock()
 
 	for i := 0; i < len(args); i += 2 {
 		key := strings.ToLower(string(args[i]))
@@ -473,20 +473,20 @@ func (server *Server) execReplConf(c myredis.Connection, args [][]byte) myredis.
 			slave.offset = offset
 			slave.lastAckTime = time.Now()
 			return &protocol.NoReply{}
-		case "listening-port":
-			port, err := strconv.ParseInt(val, 10, 64)
-			if err != nil {
-				return protocol.MakeErrReply("ERR value is not an integer or out of range")
-			}
-			slave.announcePort = int(port)
-		case "ip-address":
-			ip := string(val)
-			slave.announceIP = ip
-		case "capa":
-			cap := strings.ToLower(string(val))
-			if cap == "psync2" {
-				slave.capacity = slaveCapacityPsync2
-			}
+			// case "listening-port":
+			// 	port, err := strconv.ParseInt(val, 10, 64)
+			// 	if err != nil {
+			// 		return protocol.MakeErrReply("ERR value is not an integer or out of range")
+			// 	}
+			// 	slave.announcePort = int(port)
+			// case "ip-address":
+			// 	ip := string(val)
+			// 	slave.announceIP = ip
+			// case "capa":
+			// 	cap := strings.ToLower(string(val))
+			// 	if cap == "psync2" {
+			// 		slave.capacity = slaveCapacityPsync2
+			// 	}
 		}
 	}
 	return protocol.MakeOkReply()

@@ -1,0 +1,91 @@
+2025/09/09 11:27:10 [INFO][server.go:48] bind: 0.0.0.0:6399, start listening...
+2025/09/09 11:27:28 [INFO][server.go:89] accept link
+2025/09/09 11:27:43 [ERROR][replication_slave.go:157] unexpected auth response: -Err unknown
+
+2025/09/09 11:36:43 [INFO][server.go:63] get exit signal
+2025/09/09 11:36:43 [INFO][server.go:67] Shuting down...
+2025/09/09 11:36:43 [INFO][server.go:103] handler shutting down...
+2025/09/09 11:47:19 [INFO][server.go:48] bind: 0.0.0.0:6399, start listening...
+2025/09/09 11:47:31 [INFO][server.go:89] accept link
+2025/09/09 11:47:33 [ERROR][replication_slave.go:157] unexpected auth response: -Err unknown
+
+2025/09/09 11:54:38 [INFO][server.go:63] get exit signal
+2025/09/09 11:54:38 [INFO][server.go:67] Shuting down...
+2025/09/09 11:54:38 [INFO][server.go:103] handler shutting down...
+2025/09/09 11:54:38 [INFO][server.go:69] connection closed: 127.0.0.1:36544
+2025/09/09 11:55:09 [INFO][server.go:48] bind: 0.0.0.0:6399, start listening...
+2025/09/09 11:55:20 [INFO][server.go:89] accept link
+2025/09/09 11:55:22 [ERROR][replication_slave.go:157] unexpected auth response: -Err unknown
+
+2025/09/09 11:55:34 [INFO][server.go:69] connection closed: 127.0.0.1:56742
+2025/09/09 11:58:25 [INFO][server.go:48] bind: 0.0.0.0:6399, start listening...
+2025/09/09 12:05:57 [INFO][server.go:48] bind: 0.0.0.0:6399, start listening...
+2025/09/09 12:06:51 [INFO][server.go:89] accept link
+2025/09/09 12:06:51 [WARNING][server.go:175] error occurs: runtime error: invalid memory address or nil pointer dereference
+goroutine 94 [running]:
+runtime/debug.Stack()
+	/usr/local/go/src/runtime/debug/stack.go:26 +0x5e
+myredis/database.(*Server).Exec.func1()
+	/home/yufangxu/learnGo/myRedis/database/server.go:175 +0x45
+panic({0x72f020?, 0xa64b90?})
+	/usr/local/go/src/runtime/panic.go:787 +0x132
+myredis/database.(*Server).execReplConf(0xc0001ee460, {0x81d098, 0xc00b894000}, {0xc00b89c018, 0x2, 0xc000063ea0?})
+	/home/yufangxu/learnGo/myRedis/database/replication_master.go:481 +0x2ae
+myredis/database.(*Server).Exec(0xc0001ee460, {0x81d098, 0xc00b894000}, {0xc00b89c000, 0x3, 0x3})
+	/home/yufangxu/learnGo/myRedis/database/server.go:258 +0xf25
+myredis/myredis/server.(*Handler).Handle(0xc0001ee280, {0xc0001f6138?, 0x0?}, {0x81ac38, 0xc000186100})
+	/home/yufangxu/learnGo/myRedis/myredis/server/server.go:92 +0x15d
+myredis/tcp.ListenAndServe.func2()
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:98 +0x5c
+created by myredis/tcp.ListenAndServe in goroutine 1
+	/home/yufangxu/learnGo/myRedis/tcp/server.go:92 +0x285
+
+2025/09/09 12:07:11 [INFO][server.go:89] accept link
+2025/09/09 12:07:13 [ERROR][replication_slave.go:157] unexpected auth response: -Err unknown
+
+2025/09/09 12:07:23 [INFO][server.go:69] connection closed: 127.0.0.1:38964
+2025/09/09 12:07:51 [ERROR][replication_slave.go:157] unexpected auth response: -Err unknown
+
+2025/09/09 12:09:16 [ERROR][replication_slave.go:157] unexpected auth response: -Err unknown
+
+2025/09/09 12:09:35 [INFO][server.go:69] connection closed: 127.0.0.1:34836
+2025/09/09 12:09:40 [INFO][server.go:63] get exit signal
+2025/09/09 12:09:40 [INFO][server.go:67] Shuting down...
+2025/09/09 12:20:02 [INFO][server.go:48] bind: 0.0.0.0:6399, start listening...
+2025/09/09 12:20:13 [INFO][server.go:89] accept link
+2025/09/09 12:20:19 [INFO][replication_slave.go:329] receive psync header from master
+2025/09/09 12:20:19 [INFO][replication_slave.go:334] full re-sync with master
+2025/09/09 12:20:19 [INFO][replication_slave.go:350] repl id: fajabmkM2aWDqwlhTSenaJvDbybsTiZmiybB1FIf, current offset: 0
+2025/09/09 12:20:19 [INFO][replication_slave.go:389] received 150 bytes of rdb from master
+2025/09/09 12:20:27 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 14, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:20:37 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 28, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:20:47 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 42, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:20:57 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 56, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:21:07 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 70, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:21:17 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 84, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:21:27 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 98, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:21:37 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 112, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:21:47 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 126, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:21:57 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 140, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:22:07 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 154, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:22:17 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 168, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:22:27 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 182, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:22:37 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 196, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:22:47 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 210, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:22:57 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 224, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:23:07 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 238, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:23:17 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 252, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:23:27 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 266, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:23:37 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 280, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:23:47 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 294, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:23:57 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 308, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:24:07 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 322, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:24:17 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 336, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:24:27 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 350, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:24:37 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 364, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:24:47 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 378, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:24:57 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 392, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:25:07 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 406, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:25:17 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 420, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:25:27 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 434, "*1\r\n$4\r\nping\r\n"
+2025/09/09 12:25:37 [INFO][replication_slave.go:467] receive 14 bytes from master, current offset 448, "*1\r\n$4\r\nping\r\n"
